@@ -1,0 +1,120 @@
+/*
+ * Dartastic Hosted skin — CSS overlay applied on top of upstream Grafana.
+ *
+ * Loaded via the Dockerfile's sed-injected stylesheet link in
+ * views/index.html (after the upstream CSS bundle, so our rules win
+ * specificity ties).
+ *
+ * Selectors target Grafana 13.x emotion-CSS classes (`css-<hash>-<Component>`).
+ * The hash changes per build; the component-name suffix is stable.
+ * Verified component names from JS-bundle introspection at build time:
+ *   LoginBackground   LoginBoxBackground   LoginLogo   LoginTitle
+ *   LoginSubTitle     MegaMenuHeader       TopBarAction
+ *
+ * When upstream Grafana renames a component, the relevant selector
+ * becomes a no-op. Image overrides (grafana_icon.svg, fav32.png, etc.)
+ * continue to work because they're served by file path, not class.
+ *
+ * Brand tokens (match dartastic.io style guide):
+ *   #5e72e4  primary blue (Argon)
+ *   #324cdd  dark blue
+ *   #37c344  primary green
+ *   #15803d  deep green
+ *   #172b4d  ink (near-black)
+ *   #6b7c93  muted text
+ */
+
+/* ----- 1. AGPL §13 source-offer footer (every page) -------------- */
+/* Compliance: AGPLv3 requires offering modified source to network
+ * users.  body::after renders this on every page regardless of which
+ * Grafana view is active — login, dashboards, alerting, plugins.
+ * No JS, no DOM dependency, no Grafana-version coupling. */
+body::after {
+  content: "This service runs modified Grafana — source: github.com/dartastic/grafana-dartastic-skin · Grafana® is a trademark of Grafana Labs. Dartastic.io is not affiliated with, endorsed, or sponsored by Grafana Labs.";
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 16px;
+  font-size: 11px;
+  color: #6b7c93;
+  background: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  pointer-events: none;
+  z-index: 1000;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+/* Dark theme variant */
+body.theme-dark::after {
+  color: #97a5b8;
+  background: rgba(23, 43, 77, 0.85);
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Reserve space so dashboards don't render content under the footer. */
+body { padding-bottom: 32px; }
+
+/* ----- 2. Login page brand swap --------------------------------- */
+/* Grafana 13 hard-codes Branding.AppTitle = "Grafana" and renders
+ * `<h1>Welcome to Grafana</h1>` inside `.login-content-box` from
+ * the SPA. Since we can't change the JS bundle's strings safely,
+ * we hide the h1 text and overlay our wordmark via ::after.
+ *
+ * The `.login-content-box` class and `.login-page` body class are
+ * stable across Grafana 11/12/13 (verified by inspecting rendered
+ * DOM). The webpack-hashed logo SVG (grafana_icon.<hash>.svg)
+ * is overridden at build time in the Dockerfile, so the visible
+ * mark above the title is already the Dartastic heart-stethoscope.
+ */
+.login-page .login-content-box h1 {
+  font-size: 0 !important;
+}
+.login-page .login-content-box h1::after {
+  content: "Welcome to Dartastic Hosted";
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: inherit;
+  letter-spacing: 0.2px;
+}
+
+/* The subtitle (Grafana version line) just below the h1 — hide. */
+.login-page .login-content-box h3 {
+  display: none !important;
+}
+
+/* Constrain the logo on login so the heart-stethoscope reads at the
+ * right size. */
+.login-page .login-content-box img[alt*="Grafana"] {
+  max-width: 80px;
+  height: auto;
+}
+
+/* ----- 3. Hide upstream grafana.com links ----------------------- */
+/* The default footer carries a "Grafana v13.x" link to grafana.com.
+ * Hide it; our body::after carries the real attribution. */
+a[href*="grafana.com"],
+a[href*="github.com/grafana/grafana"] {
+  display: none !important;
+}
+/* Exception: the failure-mode browser-support link inside the
+ * preloader uses an https://grafana.com URL we don't want broken
+ * for diagnostics. Re-show inside the preloader scope only. */
+.preloader a[href*="grafana.com/docs"] {
+  display: inline !important;
+}
+
+/* ----- 4. MegaMenu header (sidebar nav) - app title overlay ----- */
+/* In Grafana 11+, the left "MegaMenu" exposes a header with the
+ * Grafana wordmark. The image asset is already overridden via the
+ * Dockerfile (grafana_icon.svg → Dartastic mark). This rule kills
+ * any literal "Grafana" text the header might render alongside it. */
+[class*="-MegaMenuHeader"] [aria-label*="Grafana"] {
+  font-size: 0;
+}
+[class*="-MegaMenuHeader"] [aria-label*="Grafana"]::after {
+  content: "Dartastic Hosted";
+  font-size: 1rem;
+  font-weight: 600;
+  color: inherit;
+  margin-left: 8px;
+}

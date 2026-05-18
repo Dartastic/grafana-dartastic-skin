@@ -1,0 +1,14 @@
+<!--
+  Dartastic Hosted login background, light theme. Soft paper with a
+  hint of brand-blue glow.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#e4ecff" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#f6f9fc" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#g)"/>
+</svg>
