@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Dartastic AI plugin logo: Flutter-blue speech bubble + spark
+       glyph. Same palette as hosted/dashboards/PALETTE.md. -->
+  <rect width="48" height="48" rx="10" fill="#0175C2"/>
+  <path d="M12 16 h24 a4 4 0 0 1 4 4 v8 a4 4 0 0 1 -4 4 h-12 l-6 6 v-6 h-6 a4 4 0 0 1 -4 -4 v-8 a4 4 0 0 1 4 -4 z"
+        fill="#FFFFFF" opacity="0.95"/>
+  <path d="M24 19 l1.6 4 l4 1.6 l-4 1.6 l-1.6 4 l-1.6 -4 l-4 -1.6 l4 -1.6 z"
+        fill="#0175C2"/>
+</svg>

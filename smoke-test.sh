@@ -7,12 +7,12 @@
 #
 # Usage:
 #   ./smoke-test.sh                                         # uses :latest
-#   IMAGE=ghcr.io/dartastic/lgtm-skinned:0.7.4-d1 ./smoke-test.sh
+#   IMAGE=ghcr.io/dartastic-io/lgtm-skinned:0.7.4-d1 ./smoke-test.sh
 #
 # Exits non-zero on any failure — wire into CI later.
 
 set -euo pipefail
-: "${IMAGE:=ghcr.io/dartastic/lgtm-skinned:latest}"
+: "${IMAGE:=ghcr.io/dartastic-io/lgtm-skinned:latest}"
 : "${PORT:=13000}"
 : "${CONTAINER:=dartastic-skin-smoketest}"
 
@@ -54,6 +54,11 @@ grep -q "dartastic-skin.css" "$LOGIN_HTML" \
   || fail "dartastic-skin.css link not injected"
 pass "dartastic-skin.css link present"
 
+# 2b. Our JS injected (text-rewriter for "Grafana" → "Dartastic Hosted")
+grep -q "dartastic-skin.js" "$LOGIN_HTML" \
+  || fail "dartastic-skin.js script not injected"
+pass "dartastic-skin.js script present"
+
 # 3. The upstream Grafana title is NOT in the rendered HTML
 if grep -q "<title>Grafana</title>" "$LOGIN_HTML"; then
   fail "<title>Grafana</title> still present — title patch missed"
@@ -82,7 +87,56 @@ grep -q "Dartastic" "$ICON_SVG" \
 pass "public/img/grafana_icon.svg served from skin"
 rm -f "$ICON_SVG"
 
-# 6. The webpack-hashed copy under public/build/static/img/ is ALSO
+# 5b. The build/img assets are what Grafana 13's index.html ACTUALLY references
+# (favicon, apple-touch-icon, AND the page-load preloader spinner). The
+# favicon/spinner regression lived exactly here: public/img/ was overridden but
+# the HTML pointed at public/build/img/, so the upstream flame leaked through.
+# Byte-match each against the skin source so a future upstream path move fails
+# loud instead of silently shipping Grafana branding.
+SKIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for f in fav32.png apple-touch-icon.png grafana_icon.svg; do
+  served="$(mktemp)"
+  curl -fsS "http://127.0.0.1:${PORT}/public/build/img/${f}" -o "$served" \
+    || fail "public/build/img/${f} did not serve"
+  cmp -s "$served" "${SKIN_DIR}/img/${f}" \
+    || { rm -f "$served"; fail "public/build/img/${f} is NOT the skin asset (upstream moved the path? see skin/Dockerfile build/img COPYs)"; }
+  rm -f "$served"
+  pass "public/build/img/${f} byte-matches skin/img/${f}"
+done
+
+# 6. The runtime text-rewriter JS file is served.
+JS="$(mktemp)"
+curl -fsS "http://127.0.0.1:${PORT}/public/js/dartastic-skin.js" -o "$JS"
+grep -q "Dartastic Hosted" "$JS" \
+  || fail "dartastic-skin.js is missing or not the skin's copy"
+pass "public/js/dartastic-skin.js served from skin"
+rm -f "$JS"
+
+# 7. The home dashboard has been replaced — no "Welcome to Grafana"
+# survives in /api/dashboards/home.  This is the surface that
+# previously rendered the upstream welcome panel with the
+# Welcome-to-Grafana h1; without this assertion a regression in the
+# COPY step in the Dockerfile would silently let upstream's home.json
+# come back through.
+HOME_JSON="$(mktemp)"
+# /api/dashboards/home requires auth; log in as admin/admin to get a
+# session cookie (Grafana ships with admin/admin defaults, smoke
+# container is fresh so the credential works).
+COOKIE_JAR="$(mktemp)"
+curl -fsS -c "$COOKIE_JAR" -H "Content-Type: application/json" \
+  -d '{"user":"admin","password":"admin"}' \
+  "http://127.0.0.1:${PORT}/login" >/dev/null
+curl -fsS -b "$COOKIE_JAR" "http://127.0.0.1:${PORT}/api/dashboards/home" -o "$HOME_JSON"
+if grep -q "Welcome to Grafana" "$HOME_JSON"; then
+  fail "home dashboard JSON still contains \"Welcome to Grafana\""
+fi
+pass "no \"Welcome to Grafana\" in /api/dashboards/home"
+grep -q "Dartastic Hosted" "$HOME_JSON" \
+  || fail "home dashboard doesn't contain the Dartastic content"
+pass "home dashboard carries Dartastic content"
+rm -f "$HOME_JSON" "$COOKIE_JAR"
+
+# 8. The webpack-hashed copy under public/build/static/img/ is ALSO
 # overridden — this is the path the React app actually fetches for
 # the visible login page logo. The hash varies per upstream version;
 # look up the current hashed filename via the build manifest then

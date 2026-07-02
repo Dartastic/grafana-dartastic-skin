@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "app",
+  "name": "Dartastic AI",
+  "id": "dartastic-ai-panel",
+  "info": {
+    "description": "Chat with the Dartastic AI gateway from inside Grafana. Calls localhost:8091 over the container's loopback via Grafana's plugin proxy — no network exit, no HMAC handshake. Refuses to render any answer without grounded citations.",
+    "author": {
+      "name": "Mindful Software LLC (Dartastic.io)",
+      "url": "https://dartastic.io"
+    },
+    "keywords": ["dartastic", "ai", "telemetry", "ot", "chat"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      { "name": "Dartastic AI", "url": "https://dartastic.io/ai" },
+      { "name": "Source", "url": "https://github.com/Dartastic/hosted/tree/main/grafana-plugins/dartastic-ai-panel" }
+    ],
+    "screenshots": [],
+    "version": "0.1.0",
+    "updated": "2026-05-20"
+  },
+  "includes": [
+    {
+      "type": "panel",
+      "name": "Dartastic AI"
+    }
+  ],
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  },
+  "routes": [
+    {
+      "path": "ai",
+      "method": "POST",
+      "url": "http://127.0.0.1:8091",
+      "headers": [
+        {
+          "name": "X-Forwarded-By",
+          "content": "dartastic-ai-panel"
+        }
+      ]
+    }
+  ]
+}

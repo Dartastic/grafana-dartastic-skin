@@ -1,0 +1,101 @@
+# Dartastic Hosted — OTel collector config (overrides upstream).
+#
+# Replaces /otel-lgtm/otelcol-config.yaml inside the lgtm-skinned
+# image.  Identical to the upstream `grafana/otel-lgtm` default
+# EXCEPT for one addition:
+#
+#   - `prometheus/ai-gateway` receiver scrapes the bundled Dartastic
+#     AI gateway's /metrics endpoint at 127.0.0.1:8091 every 15s.
+#     The gateway exposes per-customer query / token / cost counters
+#     in OpenMetrics text format (see hosted/ai-gateway/lib/src/
+#     metrics.dart).
+#
+# When AI is off on this box (no ANTHROPIC_API_KEY → entrypoint
+# doesn't start the gateway), the scrape silently fails with up=0
+# and the Mimir series quietly stop updating — no error, no log
+# spam.  When AI flips on, the panel lights up within one scrape
+# interval.
+#
+# Upstream-tracking note: when bumping UPSTREAM_TAG, diff this file
+# against `docker run --rm grafana/otel-lgtm:<new-tag> cat
+# /otel-lgtm/otelcol-config.yaml` and reconcile.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - http://*
+  prometheus/collector:
+    config:
+      scrape_configs:
+        - job_name: "opentelemetry-collector"
+          scrape_interval: 1s
+          static_configs:
+            - targets: ["127.0.0.1:8888"]
+  # Dartastic-added: scrape the bundled AI gateway's /metrics.
+  # Same loopback origin the gateway's localhost-only handler trusts.
+  prometheus/ai-gateway:
+    config:
+      scrape_configs:
+        - job_name: "dartastic-ai-gateway"
+          scrape_interval: 15s
+          metrics_path: "/metrics"
+          static_configs:
+            - targets: ["127.0.0.1:8091"]
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/ready"
+
+processors:
+  batch:
+
+exporters:
+  otlp_http/metrics:
+    endpoint: http://127.0.0.1:9090/api/v1/otlp
+    tls:
+      insecure: true
+  otlp_http/traces:
+    endpoint: http://127.0.0.1:4418
+    tls:
+      insecure: true
+  otlp_http/logs:
+    endpoint: http://127.0.0.1:3100/otlp
+    tls:
+      insecure: true
+  otlp/profiles:
+    endpoint: http://127.0.0.1:4040
+    tls:
+      insecure: true
+  debug/metrics:
+    verbosity: detailed
+  debug/traces:
+    verbosity: detailed
+  debug/logs:
+    verbosity: detailed
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/traces]
+    metrics:
+      # Dartastic-added: prometheus/ai-gateway joins the metrics pipeline.
+      receivers: [otlp, prometheus/collector, prometheus/ai-gateway]
+      processors: [batch]
+      exporters: [otlp_http/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http/logs]
+    profiles:
+      receivers: [otlp]
+      exporters: [otlp/profiles]

@@ -1,0 +1,9 @@
+# Regenerated from the upstream image on every build-and-push.sh run.
+# These files are NOT checked in — keep this dir empty in git history.
+upstream-en-US.json
+skin-en-US.json
+customer-dashboards/
+# Staged ai-gateway Dart source (rsynced from ../ai-gateway/) for
+# the Dockerfile's stage-1 `dart compile exe`.  Regenerated each
+# build; the source-of-truth lives at hosted/ai-gateway/.
+ai-gateway/

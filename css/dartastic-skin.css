@@ -15,22 +15,75 @@
  * becomes a no-op. Image overrides (grafana_icon.svg, fav32.png, etc.)
  * continue to work because they're served by file path, not class.
  *
- * Brand tokens (match dartastic.io style guide):
- *   #5e72e4  primary blue (Argon)
- *   #324cdd  dark blue
- *   #37c344  primary green
- *   #15803d  deep green
- *   #172b4d  ink (near-black)
- *   #6b7c93  muted text
+ * Brand tokens — the canonical Dartastic palette.  Source of truth is
+ * `dartastic.io/src/assets/scss/variables.scss`; this file mirrors
+ * those values as CSS custom properties under `:root` (below) so
+ * dashboards + CSS overrides can reference one set of names.
+ *
+ * Anywhere a dashboard JSON wants a series colour, prefer the named
+ * tokens here over inline hex — see `hosted/dashboards/PALETTE.md`
+ * for the application guide.
  */
 
+/* ----- 0. Canonical Dartastic palette --------------------------- */
+/* Mirrors dartastic.io's variables.scss.  Available everywhere
+ * inside the Grafana SPA via var(--dartastic-*).  Two-step indirection
+ * (define here, reference everywhere) means a brand colour shift is
+ * a one-line edit in this file. */
+:root {
+  --dartastic-primary:        #0175C2;  /* Flutter Blue — primary brand */
+  --dartastic-primary-dark:   #015a93;
+  --dartastic-primary-light:  #82d1ff;
+  --dartastic-secondary:      #607D8B;  /* Steel Gray */
+  --dartastic-success:        #4CAF50;
+  --dartastic-info:           #03A9F4;
+  --dartastic-warning:        #FF9800;
+  --dartastic-danger:         #D32F2F;  /* Rhedz Red */
+  --dartastic-ink:            #1C2834;  /* Dark Navy — body text on light */
+  --dartastic-muted:          #6b7c93;
+  --dartastic-light:          #F5F7FA;
+}
+
+/* ----- 0a. Practical Grafana UI overrides ----------------------- */
+/* Grafana 13 ships an emotion-CSS theme system — most colour tokens
+ * are compiled at build time, not addressable via CSS vars.  These
+ * overrides hit the surfaces that ARE selectable (links, primary
+ * buttons, focus rings, top-bar accent).  Series colours in charts
+ * remain panel-controlled — see `dashboards/PALETTE.md`. */
+
+/* Primary buttons + filled chips */
+button[class*="-primary"],
+a[class*="-primary"] {
+  background-color: var(--dartastic-primary) !important;
+  border-color: var(--dartastic-primary) !important;
+}
+button[class*="-primary"]:hover,
+a[class*="-primary"]:hover {
+  background-color: var(--dartastic-primary-dark) !important;
+  border-color: var(--dartastic-primary-dark) !important;
+}
+
+/* Text links (excluding the AGPL footer + grafana.com links we
+ * already neutralise in section 3). */
+a:not([href*="grafana.com"]):not([href*="github.com/grafana"]) {
+  color: var(--dartastic-primary);
+}
+
+/* Focus rings — Grafana's blue is close to ours but not exact */
+*:focus-visible {
+  outline-color: var(--dartastic-primary) !important;
+}
+
 /* ----- 1. AGPL §13 source-offer footer (every page) -------------- */
-/* Compliance: AGPLv3 requires offering modified source to network
- * users.  body::after renders this on every page regardless of which
- * Grafana view is active — login, dashboards, alerting, plugins.
- * No JS, no DOM dependency, no Grafana-version coupling. */
-body::after {
-  content: "This service runs modified Grafana — source: github.com/dartastic/grafana-dartastic-skin · Grafana® is a trademark of Grafana Labs. Dartastic.io is not affiliated with, endorsed, or sponsored by Grafana Labs.";
+/* Compliance: AGPLv3 §13 requires PROMINENTLY offering modified
+ * source to all network users — so the notice must stay permanently
+ * discoverable; it may not simply vanish. Compromise: the full-width
+ * bar shows for ~10s after load, then collapses to a small persistent
+ * "ⓘ open source" pill (bottom-right) that re-expands on hover /
+ * focus / tap. The element (with a real clickable source link — the
+ * old body::after content string wasn't clickable) is built by
+ * dartastic-skin.js (buildAgplFooter); these rules style both states. */
+#dartastic-agpl-footer {
   position: fixed;
   bottom: 0;
   left: 0;
@@ -38,21 +91,44 @@ body::after {
   padding: 6px 16px;
   font-size: 11px;
   color: #6b7c93;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   text-align: center;
-  pointer-events: none;
   z-index: 1000;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+  transition: opacity 0.25s ease;
 }
-/* Dark theme variant */
-body.theme-dark::after {
+#dartastic-agpl-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+#dartastic-agpl-footer .daf-short { display: none; }
+
+/* Collapsed state — small persistent pill, bottom-right. Keeps the
+ * §13 offer one hover away on every page instead of disappearing. */
+#dartastic-agpl-footer.is-collapsed {
+  left: auto;
+  right: 12px;
+  bottom: 10px;
+  padding: 3px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+#dartastic-agpl-footer.is-collapsed:hover { opacity: 1; }
+#dartastic-agpl-footer.is-collapsed .daf-full  { display: none; }
+#dartastic-agpl-footer.is-collapsed .daf-short { display: inline; }
+
+/* Dark theme variants */
+body.theme-dark #dartastic-agpl-footer {
   color: #97a5b8;
-  background: rgba(23, 43, 77, 0.85);
-  border-top-color: rgba(255, 255, 255, 0.08);
+  background: rgba(23, 43, 77, 0.92);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Reserve space so dashboards don't render content under the footer. */
-body { padding-bottom: 32px; }
+/* Reserve space so dashboards don't render content under the bar —
+ * only while it's expanded (JS toggles the body class). */
+body.dartastic-agpl-expanded { padding-bottom: 32px; }
 
 /* ----- 2. Login page brand swap --------------------------------- */
 /* Grafana 13 hard-codes Branding.AppTitle = "Grafana" and renders
@@ -103,18 +179,80 @@ a[href*="github.com/grafana/grafana"] {
   display: inline !important;
 }
 
-/* ----- 4. MegaMenu header (sidebar nav) - app title overlay ----- */
-/* In Grafana 11+, the left "MegaMenu" exposes a header with the
- * Grafana wordmark. The image asset is already overridden via the
- * Dockerfile (grafana_icon.svg → Dartastic mark). This rule kills
- * any literal "Grafana" text the header might render alongside it. */
-[class*="-MegaMenuHeader"] [aria-label*="Grafana"] {
-  font-size: 0;
+/* ----- 4. Hide the gettingstarted panel on the home dashboard ----
+ * Grafana's home handler auto-injects a `type: gettingstarted` panel
+ * with id=123123 (hard-coded backend constant) carrying upstream
+ * tutorial copy and "Welcome to Grafana" callouts. We can't drop it
+ * from the dashboard JSON (the server adds it after reading
+ * home.json), and `disable_plugins=gettingstarted` in custom.ini only
+ * prevents the plugin from loading — the panel container is still
+ * rendered as a "plugin not found" stub. Hide the whole container. */
+[data-viz-panel-key="panel-123123"],
+section[aria-labelledby*="123123"] {
+  display: none !important;
 }
-[class*="-MegaMenuHeader"] [aria-label*="Grafana"]::after {
-  content: "Dartastic Hosted";
-  font-size: 1rem;
+
+/* ----- 5. MegaMenu header — runtime JS handles wordmark text ----
+ * The MegaMenu header renders the brand name from a `homeNav.text`
+ * prop that the JS bundle hard-codes to "Grafana". CSS can't reach
+ * it cleanly across emotion-CSS hash drift, so dartastic-skin.js
+ * rewrites it at runtime via a MutationObserver. This stylesheet
+ * just keeps the layout tidy after the swap. */
+
+/* ----- 6. "Other" nav group (built by dartastic-skin.js) ---------
+ * The skin JS relocates non-essential left-nav items (Alerting,
+ * Connections, Administration, …) into a collapsible <li
+ * data-dartastic-other> at the bottom of the MegaMenu, so the top
+ * stays focused on Home / Dashboards / Explore / Drilldown. These
+ * rules style that group: a muted "Other" header with a chevron, a
+ * divider above it, and the collapse/expand transition. The items
+ * inside keep Grafana's own nav-item styling (we only re-parent the
+ * existing <li> nodes — nothing is hidden or disabled). */
+li[data-dartastic-other] {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(204, 204, 220, 0.12);
+  list-style: none;
+}
+.dartastic-other-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
   font-weight: 600;
-  color: inherit;
-  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--dartastic-muted);
+  text-align: left;
+}
+.dartastic-other-toggle::after {
+  content: "";
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor; /* ▼ expanded */
+  transition: transform 0.15s ease;
+}
+li[data-dartastic-other].is-collapsed .dartastic-other-toggle::after {
+  transform: rotate(-90deg); /* ▶ collapsed */
+}
+.dartastic-other-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  max-height: 1000px;
+  opacity: 1;
+  transition: max-height 0.18s ease, opacity 0.18s ease;
+}
+li[data-dartastic-other].is-collapsed .dartastic-other-list {
+  max-height: 0;
+  opacity: 0;
 }
