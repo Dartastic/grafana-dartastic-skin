@@ -1,0 +1,25 @@
+apiVersion: 1
+
+# Auto-provisioned Dartastic dashboards (#101). Files baked into the
+# image at /otel-lgtm/dartastic-dashboards/ — see Dockerfile.
+#
+# Single provider scans the whole dir, so adding a new dashboard is
+# just: drop the .json into hosted/dashboards/ and rebuild the skin.
+# No yaml edit needed.
+#
+# `folder: Dartastic` groups them into a sidebar folder so the
+# upstream LGTM dashboards (RED Metrics, JVM Overview) stay
+# separated and customers know which set is ours.
+#
+# Updates flow back: Grafana sees the file mtime change on next
+# image bump and refreshes the dashboard automatically — without
+# clobbering any panels a customer cloned-and-saved.
+
+providers:
+  - name: "Dartastic"
+    type: file
+    folder: "Dartastic"
+    folderUid: "dartastic"
+    options:
+      path: /otel-lgtm/dartastic-dashboards
+      foldersFromFilesStructure: false

@@ -1,0 +1,56 @@
+{
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "",
+      "transparent": true,
+      "type": "text",
+      "options": {
+        "mode": "markdown",
+        "content": "# Welcome to Dartastic Hosted\n\nYour dedicated observability stack. **OTel data ingest, deobfuscated stack traces, and Flutter-aware dashboards** — pre-configured and ready.\n\n- [Setup guide](https://dartastic.io/help#hosted) · how to point your apps at this stack.\n- [Dartastic Pub](https://pub.dartastic.io) · your private package registry.\n- [Dartastic Symbolizer](https://symbolizer.dartastic.io) · obfuscated traces → source lines.\n- [Support](https://dartastic.io/support) · contact the team."
+      }
+    },
+    {
+      "datasource": null,
+      "folderId": 0,
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 4 },
+      "id": 3,
+      "links": [],
+      "options": {
+        "showStarred": true,
+        "showRecentlyViewed": true,
+        "showSearch": false,
+        "showHeadings": true,
+        "folderId": 0,
+        "maxItems": 30,
+        "tags": [],
+        "query": ""
+      },
+      "title": "Your Dashboards",
+      "type": "dashlist"
+    },
+    {
+      "datasource": null,
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 4 },
+      "id": 4,
+      "title": "Getting started",
+      "transparent": false,
+      "type": "text",
+      "options": {
+        "mode": "markdown",
+        "content": "## Dart + Flutter observability\n\nThis stack ships with dashboards tuned for Dart server and Flutter mobile apps. The defaults:\n\n- **Flutter App Health** — frames, jank, ANR, vsync, native heap. Updates automatically as your apps emit OTel.\n- **Crashes — Symbolized** — production stack traces deobfuscated to source lines via the Dartastic Symbolizer.\n- **Service Map** — your Dart server topology from OTLP spans.\n\n### Send data\n\nPoint your OTel exporter at your stack's OTLP endpoint (gRPC 4317 + HTTP 4318):\n\n```\nOTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.<your-stack>.dartastic.io\nOTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <otel-ingest-key>\n```\n\nMint an **otel-ingest** key on the [Hosted tab](https://dartastic.io/dashboard?tab=hosted) at dartastic.io."
+      }
+    }
+  ],
+  "schemaVersion": 22,
+  "tags": [],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Home",
+  "uid": null,
+  "version": 1
+}

@@ -12,6 +12,45 @@
 # cluster provisioning, not "latest broke us last night". Bump the tag
 # on a deliberate cadence (weekly cron + smoke test).
 ARG UPSTREAM_TAG=latest
+
+# --- Stage 1: AOT-compile the Dartastic AI gateway (#85 P1) ---
+#
+# Source comes from `../ai-gateway/` and is staged into
+# `build/ai-gateway/` by build-and-push.sh — same pattern as the
+# dashboards staging.  The gateway binary ships in this image but
+# is OFF BY DEFAULT — dartastic-entrypoint.sh only starts it when
+# ANTHROPIC_API_KEY + at least one AI_GATEWAY_CUSTOMER_<ID>_SECRET
+# are present at boot.
+#
+# License posture: the Dart binary is Pro Commercial (see
+# ../ai-gateway/LICENSE).  Bundling a separately-licensed program
+# into the same container image is not "combining" under AGPL —
+# same as bundling nginx in a Grafana image.  The §13 source
+# offer in the cluster UI still points at the public skin mirror,
+# which does NOT include the ai-gateway source (Pro repo, not OSS).
+FROM dart:stable AS ai-gateway-build
+WORKDIR /app
+COPY build/ai-gateway/pubspec.* /app/
+RUN dart pub get
+COPY build/ai-gateway/ /app/
+RUN dart pub get --offline
+RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
+
+# --- Stage 1b: Build the Dartastic AI Grafana plugin (#85 P1.D) ---
+#
+# TypeScript + React, bundled to a Grafana plugin `dist/` via
+# webpack.  Output lands at /plugin/dist/ — that's what stage 2
+# COPYs into /var/lib/grafana/plugins/dartastic-ai-panel/.
+#
+# Plugin source-of-truth: hosted/grafana-plugins/dartastic-ai-panel/.
+# Staged into build/ai-plugin/ by build-and-push.sh.
+FROM node:20-slim AS ai-plugin-build
+WORKDIR /plugin
+COPY build/ai-plugin/ /plugin/
+RUN npm install --no-audit --no-fund
+RUN npm run build
+
+# --- Stage 2: the skinned LGTM image (the deployable) ---
 FROM grafana/otel-lgtm:${UPSTREAM_TAG}
 
 # Re-declare after FROM — Dockerfile scoping rule. Without this, the
@@ -41,6 +80,17 @@ COPY img/grafana_icon.svg       ${GF_PUBLIC}/img/grafana_icon.svg
 COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_typelogo.svg
 COPY img/fav32.png              ${GF_PUBLIC}/img/fav32.png
 COPY img/apple-touch-icon.png   ${GF_PUBLIC}/img/apple-touch-icon.png
+# Grafana 13 references the favicon, apple-touch-icon, AND the page-load
+# preloader spinner from public/build/img/ (NOT public/img/) — see
+# index.html: <link rel="icon" href="public/build/img/fav32.png">,
+# <link rel="apple-touch-icon" href="public/build/img/apple-touch-icon.png">,
+# and the preloader <img src="public/build/img/grafana_icon.svg">. Overriding
+# only public/img/ above leaves the browser loading the upstream Grafana flame
+# (the favicon + spinner regression). These build/img names are NOT hashed, so
+# a direct COPY wins. smoke-test.sh byte-checks them to catch a future move.
+COPY img/fav32.png              ${GF_PUBLIC}/build/img/fav32.png
+COPY img/apple-touch-icon.png   ${GF_PUBLIC}/build/img/apple-touch-icon.png
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/build/img/grafana_icon.svg
 COPY img/g8_login_dark.svg      ${GF_PUBLIC}/img/g8_login_dark.svg
 COPY img/g8_login_light.svg     ${GF_PUBLIC}/img/g8_login_light.svg
 # Some Grafana code paths read these alternate filenames; mirror them.
@@ -82,12 +132,61 @@ RUN set -eux; \
 # --- CSS overlay ---
 COPY css/dartastic-skin.css     ${GF_PUBLIC}/css/dartastic-skin.css
 
+# --- JS runtime text-replacer ---
+# Handles "Grafana" text that's hard-coded inside the React bundle
+# (e.g. the MegaMenu sidebar wordmark from `homeNav.text`, which
+# Grafana OSS won't let us override at config time). Runs on every
+# page load via the index.html injection below.
+COPY js/dartastic-skin.js       ${GF_PUBLIC}/js/dartastic-skin.js
+
+# --- Replace the default home dashboard ---
+# Upstream `home.json` renders a `type: welcome` panel that emits
+# `<h1>Welcome to Grafana</h1>` plus tutorial links to grafana.com,
+# and a `news` panel that fetches grafana.com/blog/news.xml. Replace
+# the whole file with Dartastic-flavored content (markdown panels +
+# dashlist; no welcome panel, no upstream news feed).
+COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
+
+# --- Rewritten en-US i18n catalog ---
+# Pre-generated on the host by build-and-push.sh + rewrite-locale.py.
+# Bulk-renames "Grafana" → "Dartastic" across ~270 user-visible
+# strings while preserving "Grafana Labs" (trademark attribution),
+# grafana.com URLs, and github.com/grafana links. This is the
+# heaviest brand-strip in the skin: it catches everything Grafana
+# emits via its i18n layer (menus, tooltips, error messages,
+# admin pages, alerting workflows, plugin-marketplace copy, ...).
+#
+# `build-and-push.sh` extracts the upstream JSON, runs
+# `build/rewrite-locale.py` against it, and writes the result to
+# `build/skin-en-US.json` which we COPY in here. If the file is
+# missing the build fails — the script is in charge of regenerating
+# it on every build so version bumps don't ship stale strings.
+COPY build/skin-en-US.json      ${GF_PUBLIC}/locales/en-US/grafana.json
+
+# --- Custom Grafana config ---
+# Disables: the upstream news feed (grafana.com blog RSS), the
+# `gettingstarted` panel plugin (the auto-injected "Welcome to
+# Grafana" tutorial card on the home dashboard), and the upstream
+# help menu (mostly grafana.com doc links).
+COPY conf/custom.ini            /otel-lgtm/grafana/conf/custom.ini
+
+# --- Dartastic dashboards (#101) ---
+# Auto-provision the customer-facing dashboards on first boot so a
+# fresh box shows "Crashes — Symbolized" + "Flutter App Health" +
+# "Mobile Release Health" + "Server Health" without anyone having
+# to import JSON by hand. Source-of-truth files live in
+# `../dashboards/` and are staged into `build/customer-dashboards/`
+# by build-and-push.sh — keeps `hosted/dashboards/*.json` as the
+# single authoritative location.
+COPY build/customer-dashboards/      /otel-lgtm/dartastic-dashboards/
+COPY conf/dartastic-dashboards.yaml  /otel-lgtm/grafana/conf/provisioning/dashboards/dartastic-dashboards.yaml
+
 # --- Template patches via sed ---
 # More robust than a unified-diff patch file across upstream version
 # bumps. Each sed runs independently; if upstream removes a string the
 # sed becomes a no-op (and the smoke test catches the regression).
 # Verify on each upstream image bump:
-#   docker run --rm ghcr.io/dartastic/lgtm-skinned:next \
+#   docker run --rm ghcr.io/dartastic-io/lgtm-skinned:next \
 #     cat /otel-lgtm/grafana/public/views/index.html | grep -i grafana
 RUN set -eux; \
     INDEX=${GF_PUBLIC}/views/index.html; \
@@ -98,20 +197,70 @@ RUN set -eux; \
     # 2. Inject our stylesheet AFTER the upstream CSS files so our
     # rules win specificity ties.
     sed -i 's|\[\[range \$asset := \.Assets\.CSSFiles\]\]|<link rel="stylesheet" href="public/css/dartastic-skin.css" />\n    [[range $asset := .Assets.CSSFiles]]|' "$INDEX"; \
-    # 3. Loading-spinner aria-label (screen-reader text) — accessibility
+    # 3. Inject our JS text-rewriter just before </body>. Runs after
+    # the React bundle so the MutationObserver catches everything
+    # the SPA renders. `defer` keeps it from blocking initial paint.
+    sed -i 's|</body>|<script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
+    # 4. Loading-spinner aria-label (screen-reader text) — accessibility
     # courtesy. Not visible in the UI but worth aligning.
     sed -i 's|aria-label="Loading Grafana"|aria-label="Loading dashboards"|' "$INDEX"; \
-    # 4. The (hidden until failure) error message — when loading
+    # 5. The (hidden until failure) error message — when loading
     # *does* fail, the user sees this. Brand-align the copy.
     sed -i 's|<h1>If you'\''re seeing this Grafana has failed to load|<h1>If you'\''re seeing this Dartastic Hosted has failed to load|' "$INDEX"; \
-    # Sanity: confirm at least one of the patches actually matched.
-    # If all four sed calls became no-ops the upstream template changed
-    # shape and we need to revisit. Fail loud during build, not in prod.
+    # Sanity: confirm patches matched. Title + JS injection are both
+    # required; if either is missing the build fails loud.
     grep -q "Dartastic Hosted" "$INDEX" \
-      || (echo "ERROR: index.html patches all no-op'd — upstream template changed. See skin/Dockerfile" >&2 && exit 1)
+      || (echo "ERROR: index.html title patch no-op'd — upstream template changed. See skin/Dockerfile" >&2 && exit 1); \
+    grep -q "public/js/dartastic-skin.js" "$INDEX" \
+      || (echo "ERROR: index.html JS injection no-op'd — </body> not found?" >&2 && exit 1)
+
+# --- Bundle the Dartastic AI gateway binary (#85 P1) ---
+# Off-by-default: the wrapper entrypoint only starts the gateway
+# when ANTHROPIC_API_KEY + at least one AI_GATEWAY_CUSTOMER_<ID>_SECRET
+# are present on the box at boot.  Customers without an AI add-on
+# never see it run.
+COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
+
+# --- OTel collector config override (#85 P1.G) ---
+# Replaces upstream's /otel-lgtm/otelcol-config.yaml.  Adds a
+# `prometheus/ai-gateway` receiver that scrapes the bundled AI
+# gateway's /metrics on 127.0.0.1:8091 every 15s and routes the
+# samples through the existing metrics pipeline into Mimir.  When
+# AI is off on this box the scrape quietly fails (up=0); nothing
+# else changes.  When the upstream tag bumps, reconcile against
+# `docker run --rm grafana/otel-lgtm:<new-tag> cat
+# /otel-lgtm/otelcol-config.yaml`.
+COPY conf/otelcol-config.yaml   /otel-lgtm/otelcol-config.yaml
+
+# --- Bundle the Dartastic AI Grafana plugin (#85 P1.D) ---
+# Grafana auto-discovers plugins under /var/lib/grafana/plugins/.
+# Grafana refuses to load unsigned plugins by default; the
+# `[plugins] allow_loading_unsigned_plugins` config line in
+# conf/custom.ini whitelists ours by id.  Customers on Hosted
+# never need to think about plugin signing — the bundled deploy
+# is trusted by virtue of being inside the same image.
+COPY --from=ai-plugin-build /plugin/dist/ /var/lib/grafana/plugins/dartastic-ai-panel/
+
+# Wrapper entrypoint — backgrounds the AI gateway when configured,
+# then execs the original LGTM entrypoint in the foreground (so if
+# LGTM dies the container restarts and supervisor semantics work).
+COPY scripts/dartastic-entrypoint.sh /usr/local/bin/dartastic-entrypoint.sh
+RUN chmod +x /usr/local/bin/dartastic-entrypoint.sh
+
+# Persistent-disk path for the gateway's state (rate-limiter
+# buckets, future cached embeddings).  Compose mounts a named
+# volume here so a container restart doesn't wipe per-customer
+# usage history — addresses the "but I want to update AI on a
+# different cadence than LGTM" concern by making state durable
+# across image bumps.
+RUN mkdir -p /var/lib/dartastic-ai && chmod 755 /var/lib/dartastic-ai
+VOLUME ["/var/lib/dartastic-ai"]
+
+EXPOSE 8091
+ENTRYPOINT ["/usr/local/bin/dartastic-entrypoint.sh"]
 
 # Labels for image provenance + AGPL source offer.
-LABEL org.opencontainers.image.title="Dartastic Hosted — skinned LGTM"
+LABEL org.opencontainers.image.title="Dartastic Hosted — skinned LGTM + AI"
 LABEL org.opencontainers.image.source="https://github.com/dartastic/grafana-dartastic-skin"
-LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only AND LicenseRef-Dartastic-Commercial"
 LABEL io.dartastic.upstream="grafana/otel-lgtm:${UPSTREAM_TAG}"
