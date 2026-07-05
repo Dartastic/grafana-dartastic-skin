@@ -5,7 +5,7 @@
 # ("Alert notifications failed to send", first-customer feedback). This file
 # gives every box a working default: one email contact point + a default policy
 # routing all alerts to it. SMTP transport is configured separately via
-# GF_SMTP_* env (see docker-compose.lgtm.yml) — the Dartastic SendGrid relay by
+# GF_SMTP_* env (see docker-compose.dartastic.yml) — the Dartastic SendGrid relay by
 # default, or a customer's BYO SMTP.
 #
 # The destination address is per-box, injected from the box's Doppler config as
