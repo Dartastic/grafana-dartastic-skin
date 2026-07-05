@@ -147,6 +147,33 @@ COPY js/dartastic-skin.js       ${GF_PUBLIC}/js/dartastic-skin.js
 # dashlist; no welcome panel, no upstream news feed).
 COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
 
+# --- De-brand outbound alert-notification emails (hosted#131) ---
+# public/emails/ng_alert_notification.{html,txt} carry three customer-facing
+# branding leaks the rest of the skin can't reach: the grafana.com header logo
+# and a footer "(c) YEAR Grafana Labs. Sent by Grafana vX.Y.Z". These render in
+# the CUSTOMER's alert emails, so — like the Slack notification-sanitizer — they
+# must not name the upstream. Patch in place, then ASSERT the leaks are gone: an
+# upstream template reword no-ops the sed and FAILS THE BUILD (louder than the
+# silent-skip SVG globs above). Unlike the in-app i18n catalog, which KEEPS
+# "Grafana Labs" as trademark attribution in-product, these are external comms
+# and get fully de-branded. The header logo becomes the box-served Dartastic
+# heart (public/img/apple-touch-icon.png via {{ .AppUrl }} — a PNG, so it renders
+# in Gmail/Outlook where SVG won't). The `grafana_folder` group label is DATA, kept.
+RUN set -eux; \
+    cd ${GF_PUBLIC}/emails; \
+    sed -i \
+      -e 's#https://grafana.com/static/assets/img/logo_new_transparent_light_400x100.png#{{ .AppUrl }}public/img/apple-touch-icon.png#' \
+      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic</a>.@' \
+      ng_alert_notification.html; \
+    sed -i \
+      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic@' \
+      ng_alert_notification.txt; \
+    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
+         ng_alert_notification.html ng_alert_notification.txt; then \
+      echo "FATAL: alert-email de-brand missed a leak — upstream template reworded?" >&2; \
+      exit 1; \
+    fi
+
 # --- Rewritten en-US i18n catalog ---
 # Pre-generated on the host by build-and-push.sh + rewrite-locale.py.
 # Bulk-renames "Grafana" → "Dartastic" across ~270 user-visible
