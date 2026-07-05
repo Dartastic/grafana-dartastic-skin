@@ -107,25 +107,45 @@ discover_next_skin_rev() {
     return 0
   fi
 
+  # Discovery MUST query the same namespace we push to ($REGISTRY). It used
+  # to hardcode the pre-migration `dartastic` namespace while pushing to
+  # `dartastic-io` (the same split-namespace bug the REGISTRY comment above
+  # records fixing on the push side) — so in CI the tag list came back denied,
+  # the fallback below said "1", and every build silently REBUILT d1 IN PLACE
+  # instead of incrementing (2026-07-05 fleet-roll failure: compose pinned a
+  # -dN that was never minted).
+  local ns="${REGISTRY#ghcr.io/}"
+
   # GHCR requires a bearer token even for private package reads.
   # Mint one scoped to read this specific repo.
   local token
   token=$(curl -sS --max-time 10 -u "${user}:${pat}" \
-    "https://ghcr.io/token?service=ghcr.io&scope=repository:dartastic/${IMAGE}:pull" \
+    "https://ghcr.io/token?service=ghcr.io&scope=repository:${ns}/${IMAGE}:pull" \
     2>/dev/null | jq -r '.token // empty')
 
   if [[ -z "$token" ]]; then
-    echo "warn: GHCR token mint failed — defaulting SKIN_REV to 1." >&2
-    echo "      Check CR_PAT scope (needs read:packages)." >&2
-    echo "1"
-    return 0
+    echo "FATAL: GHCR token mint failed with creds set — refusing the rev-1" >&2
+    echo "       fallback (it would overwrite ${upstream}-d1 in place)." >&2
+    echo "       Check CR_PAT scope (needs read:packages), or pass SKIN_REV." >&2
+    return 1
   fi
 
   local tags_json
   tags_json=$(curl -sS --max-time 10 \
     -H "Authorization: Bearer $token" \
-    "https://ghcr.io/v2/dartastic/${IMAGE}/tags/list" \
+    "https://ghcr.io/v2/${ns}/${IMAGE}/tags/list" \
     2>/dev/null || echo '{}')
+
+  # A denied/errored response ({"errors":...}) has no .tags — jq below would
+  # quietly turn that into rev 1. First-ever build (404, no package yet) is
+  # the ONLY legitimate empty; distinguish it loudly via SKIN_REV=1.
+  if ! jq -e '.tags | type == "array"' >/dev/null 2>&1 <<<"$tags_json"; then
+    echo "FATAL: GHCR tag list for ${ns}/${IMAGE} unusable — refusing the rev-1" >&2
+    echo "       fallback (it would overwrite ${upstream}-d1 in place)." >&2
+    echo "       First-ever build? Pass SKIN_REV=1 explicitly. Response was:" >&2
+    echo "       $(head -c 300 <<<"$tags_json")" >&2
+    return 1
+  fi
 
   # Find max N in <upstream>-d<N>; emit N+1, or 1 if none exist.
   local max
