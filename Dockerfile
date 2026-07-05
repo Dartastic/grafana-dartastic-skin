@@ -156,22 +156,27 @@ COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
 # upstream template reword no-ops the sed and FAILS THE BUILD (louder than the
 # silent-skip SVG globs above). Unlike the in-app i18n catalog, which KEEPS
 # "Grafana Labs" as trademark attribution in-product, these are external comms
-# and get fully de-branded. The header logo becomes the box-served Dartastic
-# heart (public/img/apple-touch-icon.png via {{ .AppUrl }} — a PNG, so it renders
-# in Gmail/Outlook where SVG won't), shrunk to 48px: the upstream slot is 200px
-# wide for a 400x100 WORDMARK, which blows a square icon up to 200x200 (Michael,
-# first delivered email). Footer copyright names the DBA "Dartastic.io".
-# "View alert" buttons go to /alerting/groups (active instances — what a
-# recipient wants), NOT /alerting/list (rule CONFIG — wrong audience).
+# and get fully de-branded. BRANDING IS INLINE, zero vertical space (Michael:
+# a standalone logo block pushes the alert content below the fold): the
+# upstream banner section is collapsed (its <img> deleted + that section's
+# padding zeroed — range-scoped to the FIRST padding:20px, which sits just
+# above the logo img; the other three 20px paddings are real section spacing),
+# and the Dartastic heart (public/img/apple-touch-icon.png, PNG so Gmail/
+# Outlook render it) replaces the folder emoji INSIDE the <h2> title line at
+# 22px. Footer copyright names the DBA "Dartastic.io". "View alert" buttons
+# go to /alerting/alerts (the ACTIVE-instances route Grafana 13 actually
+# registers — /alerting/groups renders via a legacy fallback with 404 page
+# chrome; /alerting/list is rule CONFIG, wrong audience).
 # The `grafana_folder` group label is DATA, kept.
 RUN set -eux; \
     cd ${GF_PUBLIC}/emails; \
+    sed -i '0,/logo_new_transparent/ s@padding:20px 0;@padding:0;@' \
+      ng_alert_notification.html; \
     sed -i \
-      -e 's#https://grafana.com/static/assets/img/logo_new_transparent_light_400x100.png#{{ .AppUrl }}public/img/apple-touch-icon.png#' \
-      -e 's@\(apple-touch-icon\.png[^>]*\)width:100%@\1width:48px@' \
-      -e 's@\(apple-touch-icon\.png[^>]*\)width="200"@\1width="48"@' \
+      -e 's@<img[^>]*logo_new_transparent[^>]*>@@' \
+      -e 's@📁@<img src="{{ $.AppUrl }}public/img/apple-touch-icon.png" width="22" height="22" style="border:0;vertical-align:middle;">@g' \
       -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
-      -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/groups"@g' \
+      -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/alerts"@g' \
       -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
       ng_alert_notification.html; \
     sed -i \
@@ -185,7 +190,7 @@ RUN set -eux; \
     # The Firing/View-alert/Silence button hrefs expand at RUNTIME to
     # /alerting/grafana/<uid>/view and ...?alertmanager=grafana&... — the
     # upstream name inside customer comms (AGPL/trademark: not one character).
-    # Repoint them at the native brand-free routes (rule list / silences).
+    # Repoint them at the native brand-free routes (active instances / silences).
     # SCOPE: those buttons sit inside {{ range .Alerts }}, where dot is an
     # ExtendedAlert with no AppUrl field — `.AppUrl` there ABORTS the whole
     # template ("can't evaluate field AppUrl", rice-19 2026-07-05) and the
