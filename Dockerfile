@@ -164,6 +164,8 @@ RUN set -eux; \
     sed -i \
       -e 's#https://grafana.com/static/assets/img/logo_new_transparent_light_400x100.png#{{ .AppUrl }}public/img/apple-touch-icon.png#' \
       -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic</a>.@' \
+      -e 's@href="{{ .GeneratorURL }}"@href="{{ .AppUrl }}alerting/list"@g' \
+      -e 's@href="{{ .SilenceURL }}"@href="{{ .AppUrl }}alerting/silences"@g' \
       ng_alert_notification.html; \
     sed -i \
       -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic@' \
@@ -171,6 +173,17 @@ RUN set -eux; \
     if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
          ng_alert_notification.html ng_alert_notification.txt; then \
       echo "FATAL: alert-email de-brand missed a leak — upstream template reworded?" >&2; \
+      exit 1; \
+    fi; \
+    # The Firing/View-alert/Silence button hrefs expand at RUNTIME to
+    # /alerting/grafana/<uid>/view and ...?alertmanager=grafana&... — the
+    # upstream name inside customer comms (AGPL/trademark: not one character).
+    # Repoint them at the native brand-free routes (rule list / silences).
+    # The {{ if .GeneratorURL/.SilenceURL }} display-guards stay. Assert the
+    # href forms are gone so an upstream reword fails the build, same as above.
+    if grep -Fq 'href="{{ .GeneratorURL }}"' ng_alert_notification.html \
+       || grep -Fq 'href="{{ .SilenceURL }}"' ng_alert_notification.html; then \
+      echo "FATAL: alert-email URL de-brand missed a leak — upstream template reworded?" >&2; \
       exit 1; \
     fi
 
