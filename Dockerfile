@@ -158,17 +158,24 @@ COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
 # "Grafana Labs" as trademark attribution in-product, these are external comms
 # and get fully de-branded. The header logo becomes the box-served Dartastic
 # heart (public/img/apple-touch-icon.png via {{ .AppUrl }} — a PNG, so it renders
-# in Gmail/Outlook where SVG won't). The `grafana_folder` group label is DATA, kept.
+# in Gmail/Outlook where SVG won't), shrunk to 48px: the upstream slot is 200px
+# wide for a 400x100 WORDMARK, which blows a square icon up to 200x200 (Michael,
+# first delivered email). Footer copyright names the DBA "Dartastic.io".
+# "View alert" buttons go to /alerting/groups (active instances — what a
+# recipient wants), NOT /alerting/list (rule CONFIG — wrong audience).
+# The `grafana_folder` group label is DATA, kept.
 RUN set -eux; \
     cd ${GF_PUBLIC}/emails; \
     sed -i \
       -e 's#https://grafana.com/static/assets/img/logo_new_transparent_light_400x100.png#{{ .AppUrl }}public/img/apple-touch-icon.png#' \
-      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic</a>.@' \
-      -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/list"@g' \
+      -e 's@\(apple-touch-icon\.png[^>]*\)width:100%@\1width:48px@' \
+      -e 's@\(apple-touch-icon\.png[^>]*\)width="200"@\1width="48"@' \
+      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
+      -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/groups"@g' \
       -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
       ng_alert_notification.html; \
     sed -i \
-      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic@' \
+      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic.io@' \
       ng_alert_notification.txt; \
     if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
          ng_alert_notification.html ng_alert_notification.txt; then \
