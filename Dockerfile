@@ -166,8 +166,14 @@ COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
 # 22px. Footer copyright names the DBA "Dartastic.io". "View alert" buttons
 # go to /alerting/alerts (the ACTIVE-instances route Grafana 13 actually
 # registers — /alerting/groups renders via a legacy fallback with 404 page
-# chrome; /alerting/list is rule CONFIG, wrong audience).
-# The `grafana_folder` group label is DATA, kept.
+# chrome; /alerting/list is rule CONFIG, wrong audience. The route is gated
+# on the alertingTriage toggle, enabled in docker-compose.dartastic.yml).
+# The `grafana_folder` group label stays intact as DATA (matchers, grouping)
+# but its DISPLAYED name is renamed to "folder" wherever templates print
+# label names ({{ .Name }} loops, builtin `eq` conditional — the email
+# funcmap has no sprig, so no replace/reReplaceAll; verified) and the txt
+# header's raw {{ .GroupLabels }} map print (which would show the label key)
+# becomes the alertname.
 RUN set -eux; \
     cd ${GF_PUBLIC}/emails; \
     sed -i '0,/logo_new_transparent/ s@padding:20px 0;@padding:0;@' \
@@ -178,9 +184,12 @@ RUN set -eux; \
       -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
       -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/alerts"@g' \
       -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
+      -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
       ng_alert_notification.html; \
     sed -i \
       -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic.io@' \
+      -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
+      -e 's@for {{ .GroupLabels }}@for {{ index .GroupLabels "alertname" }}@' \
       ng_alert_notification.txt; \
     if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
          ng_alert_notification.html ng_alert_notification.txt; then \
@@ -200,6 +209,13 @@ RUN set -eux; \
     if grep -Fq 'href="{{ .GeneratorURL }}"' ng_alert_notification.html \
        || grep -Fq 'href="{{ .SilenceURL }}"' ng_alert_notification.html; then \
       echo "FATAL: alert-email URL de-brand missed a leak — upstream template reworded?" >&2; \
+      exit 1; \
+    fi; \
+    # The grafana_folder DISPLAY rename must have landed in both parts (the
+    # raw {{ .Name }} loops print the label KEY to the customer otherwise).
+    if ! grep -Fq 'eq .Name "grafana_folder"' ng_alert_notification.html \
+       || ! grep -Fq 'eq .Name "grafana_folder"' ng_alert_notification.txt; then \
+      echo "FATAL: grafana_folder display-rename missing — upstream label loop reworded?" >&2; \
       exit 1; \
     fi
 
