@@ -181,6 +181,12 @@ COPY conf/custom.ini            /otel-lgtm/grafana/conf/custom.ini
 COPY build/customer-dashboards/      /otel-lgtm/dartastic-dashboards/
 COPY conf/dartastic-dashboards.yaml  /otel-lgtm/grafana/conf/provisioning/dashboards/dartastic-dashboards.yaml
 
+# --- Default alert-notification wiring (hosted#131) ---
+# A default email contact point + notification policy so a customer's alert
+# RULES actually deliver instead of "failed to send". Address is injected per
+# box as $ADMIN_ALERT_EMAIL; SMTP transport via GF_SMTP_* (docker-compose.lgtm).
+COPY conf/provisioning/alerting/dartastic-default.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-default.yaml
+
 # --- Template patches via sed ---
 # More robust than a unified-diff patch file across upstream version
 # bumps. Each sed runs independently; if upstream removes a string the
