@@ -11,27 +11,28 @@
 #
 # What auto-discovery does:
 #
-#   - UPSTREAM_TAG defaults to whatever `../vultr/docker-compose.lgtm.yml`
-#     currently pins, with the -d<N> stripped.  So if the compose says
-#     `lgtm-skinned:0.28.0-d9`, UPSTREAM_TAG becomes `0.28.0`.  This
-#     keeps every dev build on the same upstream track as production
-#     unless you explicitly bump.
+#   - UPSTREAM_TAG defaults to whatever `../docker-compose.dartastic.yml`
+#     currently pins for lgtm-skinned (the `${LGTM_TAG:-<tag>}` default), with
+#     the -d<N> stripped.  So if it says `lgtm-skinned:${LGTM_TAG:-0.28.0-d9}`,
+#     UPSTREAM_TAG becomes `0.28.0`.  Keeps every dev build on the same upstream
+#     track as production unless you explicitly bump.
 #
 #   - SKIN_REV defaults to the next integer past the highest existing
 #     `<UPSTREAM_TAG>-d<N>` tag on GHCR.  So if `d9` is the newest
 #     `0.28.0-d<N>` already pushed, this build is `d10`.  Talks to
 #     https://ghcr.io/v2/.../tags/list using GHCR_USER + CR_PAT.
 #
-#   - After a successful push, the script bumps the `lgtm-skinned:` pin
-#     in `../vultr/docker-compose.lgtm.yml` to the freshly-built tag.
-#     `git diff` to review; `up-lgtm.sh` consumes this file directly.
+#   - This does NOT rewrite any compose file. To make a build the fleet default,
+#     bump the `${LGTM_TAG:-<tag>}` pin in docker-compose.dartastic.yml, commit
+#     (build-hosted.yml rebuilds the carrier), and roll-hosted-fleet.sh. The
+#     script prints these next-steps after a push.
 #
 # Override either default if you want to:
 #
 #   UPSTREAM_TAG=0.29.0 ./build-and-push.sh        # bumping upstream
 #   SKIN_REV=99 ./build-and-push.sh                # forcing a rev
 #   PUSH=0 ./build-and-push.sh                     # local-only build
-#   NO_COMPOSE_BUMP=1 ./build-and-push.sh          # skip compose edit
+#   NO_COMPOSE_BUMP=1 ./build-and-push.sh          # accepted no-op (back-compat)
 #
 # Prereqs:
 #   - docker buildx multi-arch builder (linux/amd64,linux/arm64)
@@ -45,7 +46,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # GHCR org is dartastic-io (where provisioner/pubdev/symbolizer/watchdog live
-# and what the per-box pull token is scoped to + what vultr/docker-compose.lgtm.yml
+# and what the per-box pull token is scoped to + what docker-compose.dartastic.yml
 # pulls). The old `ghcr.io/dartastic` default put the image in the wrong (public)
 # org — so customer boxes 404'd it, and build-skin CI failed (the hosted repo's
 # GITHUB_TOKEN can't push to a different org). One source of truth: dartastic-io.
@@ -54,7 +55,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${PUSH:=1}"
 : "${NO_COMPOSE_BUMP:=0}"
 
-COMPOSE_FILE="$SCRIPT_DIR/../vultr/docker-compose.lgtm.yml"
+# Source of truth for the production LGTM image tag is the unified box compose
+# (docker-compose.dartastic.yml) — docker-compose.lgtm.yml was retired (hosted#131).
+COMPOSE_FILE="$SCRIPT_DIR/../docker-compose.dartastic.yml"
 
 # ── prereqs ──────────────────────────────────────────────────────
 need_cmd() {
@@ -67,14 +70,15 @@ need_cmd curl
 
 # ── 1. Auto-discover UPSTREAM_TAG from the compose file ─────────
 # Source of truth for "what's in production right now" is the pinned
-# image: line in vultr/docker-compose.lgtm.yml.  Strip the -d<N>
-# suffix so we stay on the same upstream track unless explicitly
-# overridden.  An env-set UPSTREAM_TAG always wins.
+# lgtm-skinned image: line in docker-compose.dartastic.yml, which reads
+# `lgtm-skinned:${LGTM_TAG:-<x.y.z>-d<N>}`. Pull the default tag out of the
+# ${VAR:-…} form (also handles a bare literal tag), then strip the -d<N> suffix
+# so we stay on the same upstream track. An env-set UPSTREAM_TAG always wins.
 if [[ -z "${UPSTREAM_TAG:-}" ]]; then
   if [[ -f "$COMPOSE_FILE" ]]; then
-    UPSTREAM_TAG=$(grep -oE "${IMAGE}:[0-9a-zA-Z._-]+" "$COMPOSE_FILE" \
+    UPSTREAM_TAG=$(grep -E "image:.*${IMAGE}:" "$COMPOSE_FILE" \
       | head -1 \
-      | sed -E "s|${IMAGE}:||; s|-d[0-9]+$||")
+      | sed -E "s|.*${IMAGE}:||; s|[\"' ].*\$||; s|^\\\$\\{[A-Za-z_]+:-||; s|\\}.*\$||; s|-d[0-9]+\$||")
   fi
   if [[ -z "${UPSTREAM_TAG:-}" ]]; then
     echo "warn: couldn't parse UPSTREAM_TAG from $COMPOSE_FILE — defaulting to 'latest'." >&2
@@ -234,27 +238,13 @@ fi
 
 echo "==> Built ${FULL}"
 
-# ── 3. Auto-bump the compose pin ────────────────────────────────
-# So the operator doesn't have to remember "now edit the compose
-# file" as a separate step.  Only runs after a successful push
-# (no point pinning a tag that isn't in the registry yet).
-COMPOSE_BUMPED=0
-if [[ "${PUSH}" == "1" && "${NO_COMPOSE_BUMP}" != "1" && -f "$COMPOSE_FILE" ]]; then
-  current_in_compose=$(grep -oE "${IMAGE}:[0-9a-zA-Z._-]+" "$COMPOSE_FILE" | head -1)
-  new_pin="${IMAGE}:${TAG}"
-  if [[ -n "$current_in_compose" && "$current_in_compose" != "$new_pin" ]]; then
-    # In-place edit; sed -i syntax differs between GNU and BSD/macOS.
-    # Use a temp file to stay portable.
-    tmp=$(mktemp)
-    sed "s|${current_in_compose}|${new_pin}|" "$COMPOSE_FILE" > "$tmp"
-    mv "$tmp" "$COMPOSE_FILE"
-    echo "==> Bumped compose pin: $current_in_compose → $new_pin"
-    echo "    (in $COMPOSE_FILE)"
-    COMPOSE_BUMPED=1
-  elif [[ "$current_in_compose" == "$new_pin" ]]; then
-    echo "==> Compose pin already on $new_pin — no edit needed."
-  fi
-fi
+# ── 3. Deployment note (carrier flow) ───────────────────────────
+# The production LGTM tag lives in docker-compose.dartastic.yml as
+# `lgtm-skinned:${LGTM_TAG:-<tag>}`, carried by the dartastic-hosted image and
+# rolled to boxes by roll-hosted-fleet.sh. We DON'T auto-rewrite that default
+# here — bumping it needs a carrier rebuild (build-hosted.yml) to reach boxes,
+# so the operator does it deliberately (see next-steps). NO_COMPOSE_BUMP is kept
+# as an accepted no-op env for backward compat.
 
 # ── 4. Tell the operator what to do next ────────────────────────
 # Absolute paths instead of `realpath --relative-to` — the latter
@@ -262,47 +252,22 @@ fi
 # to `.` and the operator gets useless `cd .` instructions.  Use
 # the cd-style absolute paths, which work everywhere.
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VULTR_DIR="$REPO_DIR/vultr"
 
-# If the compose was actually bumped, surface the review/commit
-# block.  Otherwise skip it — there's nothing to commit.
-if [[ "$COMPOSE_BUMPED" == "1" ]]; then
-  cat <<EOF
+cat <<EOF
 
 ────────────────────────────────────────────────────────────────
-Built + pushed ${FULL}.
+Built + pushed ${FULL}  (also tagged :latest).
 
-Compose pin bumped — review + commit:
+To make this the default skin for every box, bump the pin in the unified
+compose, rebuild the carrier, and roll the fleet:
     cd $REPO_DIR
-    git diff vultr/docker-compose.lgtm.yml
-    git add vultr/docker-compose.lgtm.yml && git commit -m "lgtm: bump skin to ${TAG}"
+    # edit docker-compose.dartastic.yml, lgtm service:
+    #   image: ghcr.io/dartastic-io/lgtm-skinned:\${LGTM_TAG:-${TAG}}
+    git add docker-compose.dartastic.yml && git commit -m "lgtm: bump skin to ${TAG}"
+    git push                                       # build-hosted.yml rebuilds the carrier
+    vultr/roll-hosted-fleet.sh --include-dogfood    # roll every box under doppler run
 
-Deploy to the box(es), runs from your laptop, no manual SSH:
-    cd $VULTR_DIR
-
-    # One box (dogfood / dev):
-    ./up-lgtm.sh
-
-    # Every customer box (hosted-* labels in Vultr) + optionally
-    # the dogfood box:
-    ./roll-skin-fleet.sh --include-dogfood
+Or pin ONE box without changing the fleet default: set LGTM_TAG=${TAG} in that
+box's Doppler config, then vultr/up-hosted-box.sh for it.
 ────────────────────────────────────────────────────────────────
 EOF
-else
-  cat <<EOF
-
-────────────────────────────────────────────────────────────────
-Built + pushed ${FULL}.
-Compose already on this tag — nothing to commit.
-
-If you want to deploy anyway (refresh the running container):
-    cd $VULTR_DIR
-
-    # One box (dogfood / dev):
-    ./up-lgtm.sh
-
-    # Every customer box + optionally the dogfood box:
-    ./roll-skin-fleet.sh --include-dogfood
-────────────────────────────────────────────────────────────────
-EOF
-fi
