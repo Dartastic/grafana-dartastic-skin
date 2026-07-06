@@ -13,15 +13,10 @@
 # docker-compose sets a non-empty compose-level default so this can't provision
 # an empty address.
 #
-# NOTE (#183, owner decision 2026-07-06): this file provisions ONLY the default
-# CONTACT POINT (read-only in the UI — it's ours, the safety floor). The
-# notification POLICY is deliberately NOT file-provisioned: a file policy is
-# re-asserted on every Grafana restart (wiping customer routes) AND renders the
-# whole policy UI read-only. Instead the box reconciler
-# (vultr/grafana-notify-reconcile.sh, run at deploy + every ~5 min) MERGES the
-# default-email floor route into the live tree via the API with
-# X-Disable-Provenance — customer-authored routes and root tweaks survive, and
-# the native notification-policies UI stays fully editable for the customer.
+# NOTE: provisioned alerting objects are read-only in the Grafana UI. That's
+# intended — notification destinations become dashboard-managed (hosted#131 /
+# dartastic.io#265): the box reconciler adds Slack/PagerDuty/extra-email contact
+# points on top of this default via the Grafana provisioning API.
 apiVersion: 1
 
 contactPoints:
@@ -36,3 +31,12 @@ contactPoints:
         # Send even when an alert group has multiple alerts.
         disableResolveMessage: false
 
+policies:
+  - orgId: 1
+    receiver: Dartastic default email
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
