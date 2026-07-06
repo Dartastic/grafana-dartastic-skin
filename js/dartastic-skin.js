@@ -48,6 +48,20 @@
     // owner accepts (zero-tolerance on visible upstream tokens, 2026-07-06).
     'grafana_folder': 'folder',
     'grafana_folder, alertname': 'folder, alertname',
+    // The other Grafana Labs product marks the LGTM+profiling stack ships as
+    // datasource DISPLAY names / plugin names / drilldown labels (Loki, Mimir,
+    // Tempo, Pyroscope — all Grafana Labs trademarks). Renamed to neutral data
+    // words; the datasource uid/type stay "loki"/"tempo"/… (what dashboards +
+    // alert queries bind to), so only the display changes — nothing breaks.
+    // Matches Grafana's own Drilldown naming. Brand-scan LABS_MARKS enforces
+    // this; the attribute-side leak (alt="Loki" on the datasource logo) needs
+    // the attribute pass, tracked in the Labs-marks de-brand issue.
+    'Loki': 'Logs',
+    'Tempo': 'Traces',
+    'Mimir': 'Metrics',
+    'Pyroscope': 'Profiles',
+    'Grafana Pyroscope': 'Profiles',
+    'Set Up Your Pyroscope Server': 'Set Up Your Profiles Server',
   };
 
   // ===== Left-nav streamline: relocate non-essentials into "Other" =====

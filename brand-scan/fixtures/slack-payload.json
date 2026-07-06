@@ -1,0 +1,13 @@
+{
+  "attachments": [
+    {
+      "title": "[FIRING:1] Dartastic Slack smoketest Dartastic",
+      "title_link": "https://box/alerting/grafana/dartsmoke001/view?orgId=1",
+      "text": "**Firing**\n\nValue: A=1, C=1\nLabels:\n - alertname = Dartastic Slack smoketest\n - grafana_folder = Dartastic\nSource: https://box/alerting/grafana/dartsmoke001/view?orgId=1\nSilence: https://box/alerting/silence/new?alertmanager=grafana&matcher=__alert_rule_uid__%3Ddartsmoke001&orgId=1\n",
+      "color": "#D63232",
+      "footer": "Grafana v13.0.1",
+      "footer_icon": "https://grafana.com/static/assets/img/fav32.png",
+      "ts": 1751706180
+    }
+  ]
+}

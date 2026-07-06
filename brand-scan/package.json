@@ -1,0 +1,12 @@
+{
+  "name": "dartastic-brand-scan",
+  "private": true,
+  "description": "hosted#194 brand-scan CI gate — playwright walk of the skinned image, failing on customer-visible upstream marks",
+  "type": "module",
+  "scripts": {
+    "scan": "node scan.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.61.0"
+  }
+}
