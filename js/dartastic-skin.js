@@ -28,6 +28,26 @@
   const REPLACEMENTS = {
     'Grafana': 'Dartastic Hosted',
     'Welcome to Grafana': 'Welcome to Dartastic Hosted',
+    // Alerting v2 (Grafana 13) surfaces: these strings are i18n-keyed in the
+    // bundle (t("alerting.…", "Grafana-managed …")) but the keys are MISSING
+    // from the shipped en-US catalog, so the hardcoded English fallback
+    // renders and the Dockerfile locale rewrite never sees them. Exact-match
+    // entries here; on the next upstream bump consider INJECTING the keys
+    // into the catalog instead (grep bundles for t("alerting.*"Grafana").
+    'Grafana-managed': 'Dartastic-managed',
+    'Grafana-managed alert rules': 'Dartastic-managed alert rules',
+    'Grafana built-in': 'Dartastic built-in',
+    'Receiving Grafana-managed alerts': 'Receiving Dartastic-managed alerts',
+    'Manage Alertmanager configurations and enable receiving Grafana-managed alerts':
+      'Manage Alertmanager configurations and enable receiving Dartastic-managed alerts',
+    // The system label KEY for the rule's folder (models.FolderTitleLabel,
+    // engine-baked — renaming the DATA would break matchers/grouping). This
+    // rewrites its DISPLAY in text nodes (grouped-by chips, label lists) to
+    // match the outbound-comms rename ("folder"). Known edge: a user copying
+    // the DISPLAYED name to hand-write a matcher must use grafana_folder;
+    // owner accepts (zero-tolerance on visible upstream tokens, 2026-07-06).
+    'grafana_folder': 'folder',
+    'grafana_folder, alertname': 'folder, alertname',
   };
 
   // ===== Left-nav streamline: relocate non-essentials into "Other" =====
