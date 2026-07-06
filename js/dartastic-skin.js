@@ -64,6 +64,79 @@
     'Set Up Your Pyroscope Server': 'Set Up Your Profiles Server',
   };
 
+  // ── In-sentence + attribute mark rewriting (hosted#196 / #187) ──────────
+  // REPLACEMENTS above is exact-match on a whole trimmed text node. Two
+  // surfaces it can't reach: (1) marks INSIDE longer strings — the auto-promo
+  // drawer ("Grafana Assistant is now available…"), drilldown taglines, admin
+  // copy, plugin display names; (2) attribute VALUES (alt / aria-label /
+  // title) that the brand-scan reads but no CSS/text pass touches. A single
+  // word-boundary rewrite neutralises every in-sentence mark — the same policy
+  // rewriteTitle() already applies to document.title — mapping each to its
+  // neutral word (Grafana->Dartastic, and the Labs product marks Loki->Logs,
+  // Mimir->Metrics, Tempo->Traces, Pyroscope->Profiles, e.g. the profiling
+  // onboarding copy "Add a new Pyroscope datasource…"). "Grafana Labs" is left
+  // intact (negative lookahead) so we never mint a bogus "Dartastic Labs" from
+  // an upstream mark reference; the deliberate AGPL attribution — which DOES
+  // say "Grafana® … Grafana Labs" — lives in #dartastic-agpl-footer, which
+  // every walker below skips. Case-sensitive so functional lowercase
+  // identifiers (grafana.com, grafana_folder, datasource type "loki"/"tempo")
+  // are never touched — only visible capitalised prose marks.
+  const MARK_MAP = { Grafana: 'Dartastic', Loki: 'Logs', Mimir: 'Metrics', Tempo: 'Traces', Pyroscope: 'Profiles' };
+  const MARK_RE = /\b(Grafana|Loki|Mimir|Tempo|Pyroscope)\b(?! Labs)/g;
+  const ATTR_NAMES = ['alt', 'aria-label', 'title'];
+  const FOOTER_SEL = '#dartastic-agpl-footer';
+  const ATTR_SEL = '[' + ATTR_NAMES.join('],[') + ']';
+
+  function inFooter(node) {
+    const el = node && (node.nodeType === 1 ? node : node.parentElement);
+    return !!(el && el.closest && el.closest(FOOTER_SEL));
+  }
+
+  // Exact whole-string rename first (bare "Grafana" -> the product name), then
+  // the in-sentence sweep. Idempotent: re-running on the output is a no-op
+  // (no "Grafana" remains), so it's safe to re-apply on every mutation.
+  function rewriteString(s) {
+    if (!s) return s;
+    const trimmed = s.trim();
+    if (trimmed && REPLACEMENTS[trimmed]) return s.replace(trimmed, REPLACEMENTS[trimmed]);
+    return s.replace(MARK_RE, function (m, g1) { return MARK_MAP[g1]; });
+  }
+
+  // alt / aria-label / title on an element + its descendants.
+  function rewriteAttrs(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+    const apply = (el) => {
+      if (!el.getAttribute || inFooter(el)) return;
+      for (const name of ATTR_NAMES) {
+        const v = el.getAttribute(name);
+        if (!v) continue;
+        const nv = rewriteString(v);
+        if (nv !== v) el.setAttribute(name, nv);
+      }
+    };
+    if (scope.nodeType === 1) apply(scope);
+    scope.querySelectorAll(ATTR_SEL).forEach(apply);
+  }
+
+  // #187 — the alerting rules-group header renders an inline upstream flame
+  // icon (svg[data-testid="icon-grafana"], FFF200->F15A29 gradient). It's a
+  // React icon component, not an overridable asset. Defeat the brand-scan
+  // flame signature (testid OR path-prefix OR gradient) with ATTRIBUTE-ONLY
+  // edits — blank the path, neutralise the gradient stops, rename the testid.
+  // No child-node removal, so React reconciliation stays safe; re-applied on
+  // every observer tick like the text rewrites.
+  function neutraliseFlames(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+    const kill = (svg) => {
+      svg.setAttribute('data-testid', 'icon-dartastic');
+      const p = svg.querySelector('path');
+      if (p) p.setAttribute('d', '');
+      svg.querySelectorAll('stop').forEach((s) => s.setAttribute('stop-color', 'currentColor'));
+    };
+    if (scope.nodeType === 1 && scope.matches && scope.matches('svg[data-testid="icon-grafana"]')) kill(scope);
+    scope.querySelectorAll('svg[data-testid="icon-grafana"]').forEach(kill);
+  }
+
   // ===== Left-nav streamline: relocate non-essentials into "Other" =====
   // The customer box is focused on OTel/Flutter/Dart observability, so the
   // top of the MegaMenu keeps only Home + Dashboards + Explore + Drilldown.
@@ -199,15 +272,21 @@
   function rewriteSubtree(root) {
     if (!root || !root.querySelectorAll) return 0;
     let count = 0;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) {
+        return inFooter(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      },
+    });
     let node;
     while ((node = walker.nextNode())) {
-      const trimmed = node.nodeValue && node.nodeValue.trim();
-      if (REPLACEMENTS[trimmed]) {
-        node.nodeValue = node.nodeValue.replace(trimmed, REPLACEMENTS[trimmed]);
+      const nv = rewriteString(node.nodeValue);
+      if (nv !== node.nodeValue) {
+        node.nodeValue = nv;
         count++;
       }
     }
+    rewriteAttrs(root);
+    neutraliseFlames(root);
     return count;
   }
 
@@ -235,13 +314,26 @@
     const observer = new MutationObserver(function (mutations) {
       let touchedTitle = false;
       for (const m of mutations) {
+        // React sets alt / aria-label / title AFTER mount (e.g. the brand
+        // logo, the promo drawer) — catch those attribute writes. Our own
+        // setAttribute below re-fires this, but rewriteString is idempotent so
+        // the value stops changing and the loop converges.
+        if (m.type === 'attributes') {
+          const t = m.target;
+          if (t && t.nodeType === Node.ELEMENT_NODE && !inFooter(t)) {
+            const v = t.getAttribute(m.attributeName);
+            if (v) {
+              const nv = rewriteString(v);
+              if (nv !== v) t.setAttribute(m.attributeName, nv);
+            }
+          }
+          continue;
+        }
         for (const n of m.addedNodes) {
           if (n.nodeType === Node.ELEMENT_NODE) rewriteSubtree(n);
-          else if (n.nodeType === Node.TEXT_NODE) {
-            const trimmed = n.nodeValue && n.nodeValue.trim();
-            if (REPLACEMENTS[trimmed]) {
-              n.nodeValue = n.nodeValue.replace(trimmed, REPLACEMENTS[trimmed]);
-            }
+          else if (n.nodeType === Node.TEXT_NODE && !inFooter(n)) {
+            const nv = rewriteString(n.nodeValue);
+            if (nv !== n.nodeValue) n.nodeValue = nv;
           }
         }
         // <title> child changes show up here too — observer covers
@@ -254,7 +346,10 @@
       // them back. buildOtherGroup() is idempotent (no-op once settled).
       buildOtherGroup();
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ATTR_NAMES,
+    });
     // Separate observer for <head> so document.title changes fire.
     if (document.head) {
       new MutationObserver(rewriteTitle).observe(document.head, {

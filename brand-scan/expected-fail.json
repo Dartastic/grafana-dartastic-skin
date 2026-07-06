@@ -10,112 +10,14 @@
     "scan.mjs prints an XPASS warning telling you to remove the entry.",
     "Schema: id (stable name), issue (hosted issue number), kind",
     "(text|attr|title|icon), pattern (case-sensitive JS regex against the",
-    "finding snippet), routes (prefixes or [\"*\"]), note."
+    "finding snippet), routes (prefixes or [\"*\"]), note.",
+    "",
+    "EMPTY as of hosted#196/#187: the skin's attribute pass + in-sentence mark",
+    "rewrite + flame-icon neutralisation (dartastic-skin.js) resolved every",
+    "previously-tracked leak on the lgtm-skinned image. The gate now passes",
+    "with zero xfails — any new entry means a genuinely new leak to fix, not",
+    "an accepted one. (The standalone grafana-skinned Cloud image may add its",
+    "own entries; those live/merge with that build.)"
   ],
-  "entries": [
-    {
-      "id": "alerting-group-header-flame",
-      "issue": 187,
-      "kind": "icon",
-      "pattern": "icon-grafana|M85\\.01 40\\.8",
-      "routes": ["*"],
-      "note": "Upstream flame icon renders in the /alerting/list 'Grafana-managed' rules-group header: an inline React icon component (svg[data-testid=icon-grafana], FFF200->F15A29 gradient) — not an overridable asset file. TODO(#187): once the skin replaces/hides it, delete this entry."
-    },
-    {
-      "id": "brand-logo-alt-text",
-      "issue": 194,
-      "kind": "attr",
-      "pattern": "^Grafana$",
-      "routes": ["*"],
-      "note": "The breadcrumb/login logo <img> carries alt=\"Grafana\" on every page. The IMAGE is our overridden asset (renders the Dartastic heart); the alt ATTRIBUTE leaks because dartastic-skin.js only rewrites text nodes. Found by this gate 2026-07-06; needs its own fix (attr rewrite pass or bundle sed)."
-    },
-    {
-      "id": "whats-new-drawer-aria",
-      "issue": 194,
-      "kind": "attr",
-      "pattern": "^What's new in Grafana$",
-      "routes": ["*"],
-      "note": "Grafana 13's auto-opening \"What's new\" dialog (role=dialog) carries this aria-label on every page. Found by this gate 2026-07-06."
-    },
-    {
-      "id": "whats-new-drawer-content",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "Grafana Assistant is now available",
-      "routes": ["*"],
-      "note": "Body copy of the same \"What's new\" dialog ('Grafana Assistant is now available to OSS users'). Found by this gate 2026-07-06; fix is likely a config/feature-toggle to suppress the drawer plus replacer coverage."
-    },
-    {
-      "id": "alerting-list-managed-filter",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "^Grafana managed$",
-      "routes": ["/alerting/list"],
-      "note": "Rule-source filter radio renders 'Grafana managed' (SPACE, not hyphen) — the dartastic-skin.js REPLACEMENTS map only covers 'Grafana-managed'. Found by this gate 2026-07-06; one-line REPLACEMENTS addition."
-    },
-    {
-      "id": "alertmanager-builtin-logo-alt",
-      "issue": 194,
-      "kind": "attr",
-      "pattern": "^logo for Grafana built-in$",
-      "routes": ["/alerting/admin/alertmanager"],
-      "note": "The built-in Alertmanager card's logo alt text. Same class as brand-logo-alt-text (attributes unreachable by the text-node replacer). Found by this gate 2026-07-06."
-    },
-    {
-      "id": "drilldown-tagline",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "Grafana's powerful queryless apps",
-      "routes": ["/drilldown"],
-      "note": "Drilldown landing tagline 'Drill down into your data using Grafana's powerful queryless apps'. Found by this gate 2026-07-06; i18n rewrite or REPLACEMENTS candidate."
-    },
-    {
-      "id": "admin-general-strings",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "(settings across Grafana|your Grafana config|Isolated instances of Grafana|Migrate to Grafana Cloud)",
-      "routes": ["/admin"],
-      "note": "Administration > General card copy (default preferences / settings / organizations / Grafana Cloud migration). Found by this gate 2026-07-06; i18n rewrite gap — admin pages are operator-visible on a customer box."
-    },
-    {
-      "id": "drilldown-app-plugin-names",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "Grafana (Logs|Metrics|Traces|Profiles) Drilldown",
-      "routes": ["/a/grafana-", "/drilldown"],
-      "note": "The bundled drilldown APP PLUGINS' display names are upstream's own product names ('Grafana Logs Drilldown' etc. — breadcrumbs, welcome banners). Same owner-decision class as pyroscope-plugin-display-name: nominative product name vs. patch. Found by this gate 2026-07-06."
-    },
-    {
-      "id": "drilldown-app-plugin-names-attr",
-      "issue": 194,
-      "kind": "attr",
-      "pattern": "Grafana (Logs|Metrics|Traces|Profiles) Drilldown",
-      "routes": ["/a/grafana-", "/drilldown"],
-      "note": "Breadcrumb title= / welcome-banner aria-label carrying the same upstream drilldown plugin names."
-    },
-    {
-      "id": "drilldown-feedback-links",
-      "issue": 194,
-      "kind": "attr",
-      "pattern": "^Share your thoughts about (Metrics|Logs|Traces|Profiles) in Grafana\\.$",
-      "routes": ["/a/grafana-"],
-      "note": "Upstream feedback-survey links (forms.gle / qualtrics) inside the drilldown app plugins name the upstream in their tooltips — customer-visible AND link off-platform. Found by this gate 2026-07-06; candidates for removal via CSS/JS surgery."
-    },
-    {
-      "id": "pyroscope-app-onboarding-copy",
-      "issue": 194,
-      "kind": "text",
-      "pattern": "Grafana Cloud|^Configure Grafana$",
-      "routes": ["/a/grafana-pyroscope-app"],
-      "note": "The Profiles drilldown app renders an ONBOARDING page while Pyroscope has no data yet (fresh boot — exactly what CI scans): 'Configure Grafana', 'Grafana Cloud Credentials/Profiles' setup copy with grafana.com links. Disappears once profiles flow, but a new customer's first look hits it. Found by this gate 2026-07-06."
-    },
-    {
-      "id": "datasource-logo-alt-loki",
-      "issue": 200,
-      "kind": "attr",
-      "pattern": "^Loki$",
-      "routes": ["*"],
-      "note": "The Loki datasource LOGO <img> carries alt=\"Loki\" (loki_icon.*.svg) — a Grafana Labs mark the runtime text-replacer can't reach (attributes only, same class as the #196 attribute pass). Seen on /alerting/list; datasource-logo alts surface on other pages too, so scoped to all routes. The text-node marks (Loki/Tempo/Pyroscope/Set Up Your Pyroscope Server, and the old 'Grafana Pyroscope' plugin name) are already renamed in skin/js/dartastic-skin.js REPLACEMENTS. Tracked in #200 (attribute pass); delete on close. Found by this gate 2026-07-06."
-    }
-  ]
+  "entries": []
 }

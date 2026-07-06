@@ -68,9 +68,10 @@ const AGPL_FOOTER_PILL = 'ⓘ open source';
 // #187 flame signature, lifted from the live bundle's inline icon component
 // on /alerting/list (svg[data-testid="icon-grafana"], viewBox 0 0 85.12 92.46,
 // FFF200→F15A29 gradient, path starting M85.01 40.8).
-// TODO(#187): when the skin replaces/hides that icon, this check goes green —
-// delete the alerting-group-header-flame entry from expected-fail.json (the
-// freshness check will force it once #187 closes).
+// hosted#187 FIXED: dartastic-skin.js neutraliseFlames() blanks the path +
+// gradient and renames the testid on every tick, so this signature no longer
+// matches. The check STAYS as a regression guard (any future inline flame
+// re-trips it); the alerting-group-header-flame xfail has been deleted.
 const FLAME = {
   testid: 'icon-grafana',
   pathPrefix: 'M85.01 40.8',
