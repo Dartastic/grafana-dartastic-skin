@@ -1,0 +1,49 @@
+{
+  "_comment": [
+    "hosted#194 brand-scan allowlist — the ONLY places a customer-visible",
+    "/grafana/i match is permitted. Changes to this file require a PR review",
+    "(the reviewable paper trail the issue asks for). Every entry needs a",
+    "reason. Schema: pattern = case-sensitive JS regex tested against the",
+    "matched line / attribute value; context = text|attr|title|any (which",
+    "scan surface it applies to) or email-template (check-emails.sh);",
+    "routes = list of route prefixes it applies to, or [\"*\"] for all.",
+    "Be conservative: prefer narrow routes + anchored patterns."
+  ],
+  "entries": [
+    {
+      "pattern": "^This service runs modified Grafana — source: github\\.com/dartastic/grafana-dartastic-skin · Grafana® is a trademark of Grafana Labs\\. Dartastic\\.io is not affiliated with, endorsed, or sponsored by Grafana Labs\\.$",
+      "context": "text",
+      "routes": ["*"],
+      "reason": "AGPL §13 source offer + nominative trademark attribution — the footer dartastic-skin.js injects (buildAgplFooter). Required by license and deliberately names the upstream. scan.mjs also structurally verifies the #dartastic-agpl-footer element's text is EXACTLY this before excluding it from the body-text sweep, so this entry cannot mask anything else."
+    },
+    {
+      "pattern": "^ⓘ open source$",
+      "context": "text",
+      "routes": ["*"],
+      "reason": "The collapsed pill state of the same AGPL §13 footer (no upstream mark in it; listed so the structural footer check documents both states)."
+    },
+    {
+      "pattern": "\\bgrafana_folder\\b",
+      "context": "any",
+      "routes": ["/alerting"],
+      "reason": "Engine-baked system label KEY (models.FolderTitleLabel) appearing as a DATA value in matcher/label contexts on alerting pages. Renaming the DATA breaks matchers/grouping; the skin rewrites its DISPLAY to 'folder' where it appears as a bare text node (see skin/js/dartastic-skin.js REPLACEMENTS), but the raw token can legitimately surface inside user-authored matcher expressions. Allowed only under /alerting."
+    }
+  ],
+  "email_template_entries": [
+    {
+      "pattern": "eq \\.Name \"grafana_folder\"",
+      "context": "email-template",
+      "reason": "Go-template CONDITIONAL the skin Dockerfile injects to rename the grafana_folder label key's DISPLAY to 'folder'. Compares against the engine-baked label key; the string is template source, never rendered to the customer."
+    },
+    {
+      "pattern": "\\{\\{ \\.GroupLabels\\.grafana_folder \\}\\}",
+      "context": "email-template",
+      "reason": "Go-template field access printing the label's VALUE (the folder name the customer chose). The key itself is never rendered."
+    },
+    {
+      "pattern": "eq \\(\\.GroupLabels\\.SortedPairs\\.Names \\| join \",\"\\) \"alertname,grafana_folder\"",
+      "context": "email-template",
+      "reason": "Upstream Go-template CONDITIONAL comparing the group-label KEY LIST against the engine-baked default grouping. Template source, never rendered; the branch it guards prints label VALUES only."
+    }
+  ]
+}
