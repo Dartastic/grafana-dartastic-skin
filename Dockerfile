@@ -259,6 +259,13 @@ COPY conf/dartastic-dashboards.yaml  /otel-lgtm/grafana/conf/provisioning/dashbo
 # box as $ADMIN_ALERT_EMAIL; SMTP transport via GF_SMTP_* (docker-compose.lgtm).
 COPY conf/provisioning/alerting/dartastic-default.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-default.yaml
 
+# --- Starter alert rules (hosted#184) ---
+# A small pack of file-provisioned rules (app error rate, crashes, no-telemetry,
+# box disk/CPU/memory) so a fresh box does something useful the moment a
+# destination exists — like the pre-loaded dashboards. Unrouted → falls through
+# to the default policy the reconciler maintains (#183).
+COPY conf/provisioning/alerting/dartastic-starter-rules.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-starter-rules.yaml
+
 # --- Template patches via sed ---
 # More robust than a unified-diff patch file across upstream version
 # bumps. Each sed runs independently; if upstream removes a string the
