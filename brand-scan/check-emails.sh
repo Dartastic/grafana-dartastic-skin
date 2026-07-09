@@ -24,10 +24,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Grafana's public tree lives at a different prefix per base image:
+#   grafana/otel-lgtm  → /otel-lgtm/grafana/public   (lgtm-skinned)
+#   grafana/grafana    → /usr/share/grafana/public   (grafana-skinned, discrete stack)
+# Auto-detect (override with EMAILS_DIR) so one gate serves both images.
 echo "==> [emails] extracting ng_alert_notification.{html,txt} from ${IMAGE}"
 CID="$(docker create "$IMAGE")"
-docker cp "${CID}:/otel-lgtm/grafana/public/emails/ng_alert_notification.html" "$TMP/" >/dev/null
-docker cp "${CID}:/otel-lgtm/grafana/public/emails/ng_alert_notification.txt" "$TMP/" >/dev/null
+if [[ -z "${EMAILS_DIR:-}" ]]; then
+  for cand in /otel-lgtm/grafana/public/emails /usr/share/grafana/public/emails; do
+    if docker cp "${CID}:${cand}/ng_alert_notification.html" "$TMP/" >/dev/null 2>&1; then
+      EMAILS_DIR="$cand"; break
+    fi
+  done
+fi
+[[ -n "${EMAILS_DIR:-}" ]] || { echo "FATAL: ng_alert_notification.html not found in ${IMAGE} (set EMAILS_DIR)" >&2; exit 1; }
+docker cp "${CID}:${EMAILS_DIR}/ng_alert_notification.html" "$TMP/" >/dev/null
+docker cp "${CID}:${EMAILS_DIR}/ng_alert_notification.txt" "$TMP/" >/dev/null
 
 # Pull the allowed template-source patterns out of allowlist.json so the
 # email allowlist lives in the same PR-reviewed file as the DOM one.
