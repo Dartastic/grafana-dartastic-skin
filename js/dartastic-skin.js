@@ -62,6 +62,23 @@
     'Pyroscope': 'Profiles',
     'Grafana Pyroscope': 'Profiles',
     'Set Up Your Pyroscope Server': 'Set Up Your Profiles Server',
+    // The built-in "-- Grafana --" datasource (special uid, used for
+    // annotations / mixed / -- Dashboard -- refs) surfaces in the Explore
+    // datasource picker + breadcrumb. Rename the DISPLAY only — the uid stays
+    // "-- Grafana --", so dashboards/queries that reference it are untouched.
+    // The attribute forms (breadcrumb title=, logo alt=) are unreachable by
+    // this text-node walker and are tracked under #200 (attribute pass).
+    '-- Grafana --': '-- Dartastic --',
+    '(-- Grafana --)': '(-- Dartastic --)',
+    // Logs drilldown (grafana-lokiexplore-app) empty-state copy, shown on the
+    // standalone (grafana-skinned) image before a Logs datasource is
+    // provisioned. Loki→Logs, in-sentence (the bare 'Loki' rename above is
+    // exact-node-match and can't reach these). Real Cloud boxes provision the
+    // per-org datasource via the tenant-reconciler, so this empty state does
+    // not render there; the rename keeps the bare-image scan clean.
+    'We noticed there is no Loki datasource configured.':
+      'We noticed there is no Logs datasource configured.',
+    'Add a Loki datasource to view logs.': 'Add a Logs datasource to view logs.',
   };
 
   // ── In-sentence + attribute mark rewriting (hosted#196 / #187) ──────────

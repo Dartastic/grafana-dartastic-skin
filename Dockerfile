@@ -310,7 +310,8 @@ COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 # Replaces upstream's /otel-lgtm/otelcol-config.yaml.  Adds a
 # `prometheus/ai-gateway` receiver that scrapes the bundled AI
 # gateway's /metrics on 127.0.0.1:8091 every 15s and routes the
-# samples through the existing metrics pipeline into Mimir.  When
+# samples through the existing metrics pipeline into Prometheus
+# (the metrics store otel-lgtm bundles — not Mimir).  When
 # AI is off on this box the scrape quietly fails (up=0); nothing
 # else changes.  When the upstream tag bumps, reconcile against
 # `docker run --rm grafana/otel-lgtm:<new-tag> cat

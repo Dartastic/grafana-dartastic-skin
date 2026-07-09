@@ -1,0 +1,158 @@
+# Dartastic — skinned standalone Grafana (grafana-skinned).
+#
+# Second build target of the same skin: identical brand-strip assets as the
+# lgtm-skinned Dockerfile, applied to upstream grafana/grafana instead of the
+# otel-lgtm single-binary. This is the Grafana for the DISCRETE stack:
+# Dartastic Cloud (multi-tenant, doc/plans/dartastic-cloud.md) and, after the
+# Hosted convergence, Hosted boxes too — at which point lgtm-skinned retires.
+#
+# What is deliberately NOT here (vs ../Dockerfile):
+#   - AI gateway + AI panel plugin stages (single-tenant secrets model;
+#     deferred on Cloud — #85 posture unchanged for Hosted's lgtm image).
+#   - File-provisioned customer dashboards + default alerting contact point:
+#     on the discrete stack the tenant-reconciler imports dashboards and
+#     creates contact points PER GRAFANA ORG via the admin API (file
+#     provisioning only reaches org 1, the datasource-less quarantine org).
+#   - home.json replacement: per-org home dashboards are set by the
+#     reconciler through org preferences. Org 1 shows the stock home with
+#     the i18n rewrite applied ("Welcome to Dartastic"), no news feed.
+#   - otelcol config (no collector in this image — the stack runs its own).
+#
+# AGPLv3 §13: this Dockerfile + the files it COPYs are part of our published
+# Grafana modifications, mirrored to the public skin repo like ../Dockerfile.
+#
+# Build: ./build-grafana-skinned.sh   (stages the locale rewrite, then builds)
+# Gate:  the same brand-scan (../brand-scan/) must pass against this image.
+ARG UPSTREAM_TAG=13.0.1
+
+FROM grafana/grafana:${UPSTREAM_TAG}
+ARG UPSTREAM_TAG
+
+# grafana/grafana runs as USER grafana; the sed/glob RUN steps below patch
+# root-owned files under /usr/share/grafana, so build as root and drop back.
+USER root
+
+# Public asset tree in the standalone image (vs /otel-lgtm/grafana/public in
+# the single-binary image — same layout underneath, different prefix).
+ARG GF_PUBLIC=/usr/share/grafana/public
+
+# --- Image assets: logos, favicons, login backgrounds (same set as ../Dockerfile) ---
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/img/grafana_icon.svg
+COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_typelogo.svg
+COPY img/fav32.png              ${GF_PUBLIC}/img/fav32.png
+COPY img/apple-touch-icon.png   ${GF_PUBLIC}/img/apple-touch-icon.png
+COPY img/fav32.png              ${GF_PUBLIC}/build/img/fav32.png
+COPY img/apple-touch-icon.png   ${GF_PUBLIC}/build/img/apple-touch-icon.png
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/build/img/grafana_icon.svg
+COPY img/g8_login_dark.svg      ${GF_PUBLIC}/img/g8_login_dark.svg
+COPY img/g8_login_light.svg     ${GF_PUBLIC}/img/g8_login_light.svg
+COPY img/g8_login_dark.svg      ${GF_PUBLIC}/img/login_background_dark.svg
+COPY img/g8_login_light.svg     ${GF_PUBLIC}/img/login_background_light.svg
+COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo-dark.svg
+COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo-light.svg
+COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo_dark.svg
+COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo_light.svg
+
+COPY img/grafana_icon.svg       /tmp/skin/grafana_icon.svg
+COPY img/g8_login_dark.svg      /tmp/skin/g8_login_dark.svg
+COPY img/g8_login_light.svg     /tmp/skin/g8_login_light.svg
+COPY img/grafana_typelogo.svg   /tmp/skin/grafana_text_logo_dark.svg
+COPY img/grafana_typelogo.svg   /tmp/skin/grafana_text_logo_light.svg
+
+# Overwrite the webpack hash-named copies (same silent-skip semantics as
+# ../Dockerfile — the brand-scan gate catches a missed override downstream).
+RUN set -eux; \
+    cd ${GF_PUBLIC}/build/static/img; \
+    for src in /tmp/skin/*.svg; do \
+      base=$(basename "$src" .svg); \
+      for target in ${base}.*.svg; do \
+        if [ -f "$target" ]; then \
+          cp "$src" "$target"; \
+          echo "  override: build/static/img/$target ← skin/${base}.svg"; \
+        fi; \
+      done; \
+    done; \
+    rm -rf /tmp/skin
+
+# --- CSS overlay + JS runtime text-replacer (same files) ---
+COPY css/dartastic-skin.css     ${GF_PUBLIC}/css/dartastic-skin.css
+COPY js/dartastic-skin.js       ${GF_PUBLIC}/js/dartastic-skin.js
+
+# --- Replace the default home dashboard ---
+# Even though per-org homes are set by the reconciler, org 1 (the
+# datasource-less quarantine org a freshly-linked user first lands in) shows
+# the DEFAULT home. Stock Grafana's home.json carries a `welcome` panel
+# ("Welcome to Grafana") and a `news` panel that fetches grafana.com/blog —
+# both customer-visible upstream marks. Same replacement the lgtm skin uses.
+COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
+
+# --- De-brand outbound alert-notification emails ---
+# Same patch-and-assert block as ../Dockerfile (see the long rationale there);
+# the templates live at the same public/emails/ path in the standalone image.
+RUN set -eux; \
+    cd ${GF_PUBLIC}/emails; \
+    sed -i '0,/logo_new_transparent/ s@padding:20px 0;@padding:0;@' \
+      ng_alert_notification.html; \
+    sed -i \
+      -e 's@<img[^>]*logo_new_transparent[^>]*>@@' \
+      -e 's@📁@<img src="{{ $.AppUrl }}public/img/apple-touch-icon.png" width="22" height="22" style="border:0;vertical-align:middle;">@g' \
+      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
+      -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/alerts"@g' \
+      -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
+      -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
+      ng_alert_notification.html; \
+    sed -i \
+      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic.io@' \
+      -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
+      -e 's@for {{ .GroupLabels }}@for {{ index .GroupLabels "alertname" }}@' \
+      ng_alert_notification.txt; \
+    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
+         ng_alert_notification.html ng_alert_notification.txt; then \
+      echo "FATAL: alert-email de-brand missed a leak — upstream template reworded?" >&2; \
+      exit 1; \
+    fi; \
+    if grep -Fq 'href="{{ .GeneratorURL }}"' ng_alert_notification.html \
+       || grep -Fq 'href="{{ .SilenceURL }}"' ng_alert_notification.html; then \
+      echo "FATAL: alert-email URL de-brand missed a leak — upstream template reworded?" >&2; \
+      exit 1; \
+    fi; \
+    if ! grep -Fq 'eq .Name "grafana_folder"' ng_alert_notification.html \
+       || ! grep -Fq 'eq .Name "grafana_folder"' ng_alert_notification.txt; then \
+      echo "FATAL: grafana_folder display-rename missing — upstream label loop reworded?" >&2; \
+      exit 1; \
+    fi
+
+# --- Rewritten en-US i18n catalog ---
+# Staged by build-grafana-skinned.sh: extracted from grafana/grafana:${UPSTREAM_TAG}
+# (NOT the otel-lgtm image) and run through the same build/rewrite-locale.py.
+COPY build/skin-grafana-en-US.json  ${GF_PUBLIC}/locales/en-US/grafana.json
+
+# --- Custom Grafana config (same overlay; path differs in this image) ---
+# The docker image reads $GF_PATHS_CONFIG=/etc/grafana/grafana.ini; the file
+# is a pure overlay (news feed off, gettingstarted disabled, help hidden,
+# unsigned-plugin allow for the AI panel — harmless when the plugin isn't
+# bundled, and ready for when AI lands on the discrete stack).
+COPY conf/custom.ini            /etc/grafana/grafana.ini
+
+# --- Template patches via sed (same as ../Dockerfile; brand-neutral title) ---
+# Title is "Dartastic" (not "Dartastic Hosted") — this image serves Cloud now
+# and Hosted after the convergence.
+RUN set -eux; \
+    INDEX=${GF_PUBLIC}/views/index.html; \
+    sed -i 's|<title>\[\[\.AppTitle\]\]</title>|<title>Dartastic</title>|' "$INDEX"; \
+    sed -i 's|\[\[range \$asset := \.Assets\.CSSFiles\]\]|<link rel="stylesheet" href="public/css/dartastic-skin.css" />\n    [[range $asset := .Assets.CSSFiles]]|' "$INDEX"; \
+    sed -i 's|</body>|<script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
+    sed -i 's|aria-label="Loading Grafana"|aria-label="Loading dashboards"|' "$INDEX"; \
+    sed -i 's|<h1>If you'\''re seeing this Grafana has failed to load|<h1>If you'\''re seeing this Dartastic has failed to load|' "$INDEX"; \
+    grep -q "<title>Dartastic</title>" "$INDEX" \
+      || (echo "ERROR: index.html title patch no-op'd — upstream template changed. See skin/Dockerfile.grafana" >&2 && exit 1); \
+    grep -q "public/js/dartastic-skin.js" "$INDEX" \
+      || (echo "ERROR: index.html JS injection no-op'd — </body> not found?" >&2 && exit 1)
+
+# Back to the upstream image's unprivileged user + stock entrypoint.
+USER grafana
+
+LABEL org.opencontainers.image.title="Dartastic — skinned Grafana (discrete stack)"
+LABEL org.opencontainers.image.source="https://github.com/dartastic/grafana-dartastic-skin"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+LABEL io.dartastic.upstream="grafana/grafana:${UPSTREAM_TAG}"
