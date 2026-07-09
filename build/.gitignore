@@ -6,6 +6,7 @@ skin-en-US.json
 upstream-grafana-en-US.json
 skin-grafana-en-US.json
 customer-dashboards/
+reference-demo-dashboards/
 # Staged ai-gateway Dart source (rsynced from ../ai-gateway/) for
 # the Dockerfile's stage-1 `dart compile exe`.  Regenerated each
 # build; the source-of-truth lives at hosted/ai-gateway/.

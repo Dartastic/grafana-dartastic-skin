@@ -198,6 +198,18 @@ rm -f "$SCRIPT_DIR/build/customer-dashboards/"*.json
 cp "$SCRIPT_DIR/../dashboards/"*.json "$SCRIPT_DIR/build/customer-dashboards/"
 ls -1 "$SCRIPT_DIR/build/customer-dashboards/" | sed 's/^/    /'
 
+# Stage the demo-specific dashboards from ../dashboards/demo/ into
+# build/reference-demo-dashboards/. These land in their own
+# "Dartastic Reference Demo" Grafana folder (see
+# conf/dartastic-reference-demo-dashboards.yaml), separate from the
+# product dashboards above. Source-of-truth stays
+# `hosted/dashboards/demo/*.json`.
+echo "==> Staging Dartastic Reference Demo dashboards from ../dashboards/demo/"
+mkdir -p "$SCRIPT_DIR/build/reference-demo-dashboards"
+rm -f "$SCRIPT_DIR/build/reference-demo-dashboards/"*.json
+cp "$SCRIPT_DIR/../dashboards/demo/"*.json "$SCRIPT_DIR/build/reference-demo-dashboards/"
+ls -1 "$SCRIPT_DIR/build/reference-demo-dashboards/" | sed 's/^/    /'
+
 # Stage the AI gateway Dart source so the Dockerfile's stage-1
 # `dart compile exe` can reach it without crossing the build
 # context boundary.  Same pattern as the dashboards stage above.

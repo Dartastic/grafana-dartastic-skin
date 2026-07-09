@@ -1,0 +1,22 @@
+apiVersion: 1
+
+# Auto-provisioned "Dartastic Reference Demo" dashboards. These are
+# demo-specific — they light up when a customer runs the Dartastic
+# Reference Demo (weather_api + cache_service + the traced nginx
+# edge). Kept in their OWN sidebar folder so they stay separate from
+# the product "Dartastic" dashboards (see dartastic-dashboards.yaml).
+#
+# Single provider scans the whole dir, so adding a new demo dashboard
+# is just: drop the .json into hosted/dashboards/demo/ and rebuild the
+# skin. Source-of-truth files there are staged into
+# build/reference-demo-dashboards/ by build-and-push.sh — no yaml edit
+# needed.
+
+providers:
+  - name: "Dartastic Reference Demo"
+    type: file
+    folder: "Dartastic Reference Demo"
+    folderUid: "dartastic-reference-demo"
+    options:
+      path: /otel-lgtm/dartastic-reference-demo-dashboards
+      foldersFromFilesStructure: false
