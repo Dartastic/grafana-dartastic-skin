@@ -253,6 +253,15 @@ COPY conf/custom.ini            /otel-lgtm/grafana/conf/custom.ini
 COPY build/customer-dashboards/      /otel-lgtm/dartastic-dashboards/
 COPY conf/dartastic-dashboards.yaml  /otel-lgtm/grafana/conf/provisioning/dashboards/dartastic-dashboards.yaml
 
+# --- Dartastic Reference Demo dashboards ---
+# The reference-demo dashboards (Service Overview) in their own
+# "Dartastic Reference Demo" sidebar folder, separate from the
+# product dashboards above. They populate when a customer runs the
+# Dartastic Reference Demo. Staged from ../dashboards/demo/ by
+# build-and-push.sh.
+COPY build/reference-demo-dashboards/            /otel-lgtm/dartastic-reference-demo-dashboards/
+COPY conf/dartastic-reference-demo-dashboards.yaml  /otel-lgtm/grafana/conf/provisioning/dashboards/dartastic-reference-demo-dashboards.yaml
+
 # --- Default alert-notification wiring (hosted#131) ---
 # A default email contact point + notification policy so a customer's alert
 # RULES actually deliver instead of "failed to send". Address is injected per
