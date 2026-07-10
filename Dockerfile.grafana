@@ -35,6 +35,10 @@ USER root
 # Public asset tree in the standalone image (vs /otel-lgtm/grafana/public in
 # the single-binary image — same layout underneath, different prefix).
 ARG GF_PUBLIC=/usr/share/grafana/public
+# Product name shown on the login page + text rewrites. One skin source,
+# two products: hosted boxes build with the default; cloud-1 builds with
+# --build-arg PRODUCT_NAME="Dartastic Cloud Observatory".
+ARG PRODUCT_NAME="Dartastic Hosted"
 
 # --- Image assets: logos, favicons, login backgrounds (same set as ../Dockerfile) ---
 COPY img/grafana_icon.svg       ${GF_PUBLIC}/img/grafana_icon.svg
@@ -77,6 +81,15 @@ RUN set -eux; \
 # --- CSS overlay + JS runtime text-replacer (same files) ---
 COPY css/dartastic-skin.css     ${GF_PUBLIC}/css/dartastic-skin.css
 COPY js/dartastic-skin.js       ${GF_PUBLIC}/js/dartastic-skin.js
+
+# Stamp the product name into the skin (source files say "Dartastic Hosted";
+# a cloud build rewrites to its PRODUCT_NAME). Plain-string sed: the name
+# appears only inside string literals in both files.
+RUN if [ "${PRODUCT_NAME}" != "Dartastic Hosted" ]; then \
+      sed -i "s|Dartastic Hosted|${PRODUCT_NAME}|g" \
+        "${GF_PUBLIC}/css/dartastic-skin.css" \
+        "${GF_PUBLIC}/js/dartastic-skin.js"; \
+    fi
 
 # --- Replace the default home dashboard ---
 # Even though per-org homes are set by the reconciler, org 1 (the

@@ -158,6 +158,14 @@ body.dartastic-agpl-expanded { padding-bottom: 32px; }
   display: none !important;
 }
 
+/* The login-page footer icon row (upstream docs/support/community links).
+   Dead ends for Dartastic customers (owner, 2026-07-10) — hide. The
+   AGPL/open-source attribution badge is NOT here; it stays visible. */
+.login-page footer,
+.login-page [data-testid="login-footer"] {
+  display: none !important;
+}
+
 /* Constrain the logo on login so the heart-stethoscope reads at the
  * right size. */
 .login-page .login-content-box img[alt*="Grafana"] {

@@ -20,6 +20,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${REGISTRY:=ghcr.io/dartastic-io}"
 : "${IMAGE:=grafana-skinned}"
 : "${PUSH:=1}"
+# Product branding stamped into the skin at build (login title + text
+# rewrites). Default = hosted. Cloud build:
+#   PRODUCT_NAME="Dartastic Cloud Observatory" IMAGE=grafana-skinned-cloud \
+#     ./build-grafana-skinned.sh
+: "${PRODUCT_NAME:=Dartastic Hosted}"
 # Pin: the Grafana version inside the current lgtm-skinned (13.0.1) — keep the
 # two images on the same Grafana until lgtm-skinned retires post-convergence.
 : "${UPSTREAM_TAG:=13.0.1}"
@@ -101,12 +106,14 @@ if [[ "${PUSH}" == "1" ]]; then
     --platform linux/amd64,linux/arm64 \
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
+    --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \
     --tag "${FULL}" --tag "${LATEST}" \
     --push .
 else
   docker buildx build \
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
+    --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \
     --tag "${FULL}" --tag "${LATEST}" \
     --load .
 fi
