@@ -264,3 +264,32 @@ li[data-dartastic-other].is-collapsed .dartastic-other-list {
   max-height: 0;
   opacity: 0;
 }
+
+/* Belt for the What's-new splash kill (primary: [feature_toggles]
+   splashScreen=false in custom.ini). If a future Grafana ships the modal
+   past the toggle, hide the dialog by its aria-label prefix (i18n key
+   splash-screen.aria-label — "What's new in <product>"). */
+div[role="dialog"][aria-label^="What's new"] {
+  display: none !important;
+}
+
+/* Dartastic dashboards injected under the nav's Dashboards item
+   (dartastic-skin.js buildNavDashList). Match Grafana's nav child rows. */
+.dartastic-nav-dashlist {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px 0;
+}
+.dartastic-nav-dashlist .dartastic-nav-dashlink {
+  display: block;
+  padding: 5px 16px 5px 42px;
+  font-size: 13px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+.dartastic-nav-dashlist .dartastic-nav-dashlink:hover {
+  opacity: 1;
+  text-decoration: underline;
+}

@@ -41,7 +41,7 @@
       "type": "text",
       "options": {
         "mode": "markdown",
-        "content": "## Dart + Flutter observability\n\nThis stack ships with dashboards tuned for Dart server and Flutter mobile apps. The defaults:\n\n- **Flutter App Health** — frames, jank, ANR, vsync, native heap. Updates automatically as your apps emit OTel.\n- **Crashes — Symbolized** — production stack traces deobfuscated to source lines via the Dartastic Symbolizer.\n- **Service Map** — your Dart server topology from OTLP spans.\n\n### Send data\n\nPoint your OTel exporter at your stack's OTLP endpoint (gRPC 4317 + HTTP 4318):\n\n```\nOTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.<your-stack>.dartastic.io\nOTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <otel-ingest-key>\n```\n\nMint an **otel-ingest** key on the [Hosted tab](https://dartastic.io/dashboard?tab=hosted) at dartastic.io."
+        "content": "## Dart + Flutter observability\n\nThis stack ships with dashboards tuned for Dart server and Flutter mobile apps. The defaults:\n\n- **Flutter App Health** — frames, jank, ANR, vsync, native heap. Updates automatically as your apps emit OTel.\n- **Crashes — Symbolized** — production stack traces deobfuscated to source lines via the Dartastic Symbolizer.\n- **Service Map** — your Dart server topology from OTLP spans.\n\n### Send data\n\nPoint your OTel exporter at your stack's OTLP endpoint (gRPC 4317 + HTTP 4318):\n\n```\nOTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.<your-stack>.dartastic.io\nOTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <otlp-ingest-key>\n```\n\nMint an **OTLP ingest** key on the [Hosted tab](https://dartastic.io/dashboard?tab=hosted) at dartastic.io."
       }
     }
   ],
