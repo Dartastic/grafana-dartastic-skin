@@ -97,7 +97,14 @@ RUN if [ "${PRODUCT_NAME}" != "Dartastic Hosted" ]; then \
 # the DEFAULT home. Stock Grafana's home.json carries a `welcome` panel
 # ("Welcome to Grafana") and a `news` panel that fetches grafana.com/blog —
 # both customer-visible upstream marks. Same replacement the lgtm skin uses.
+# Cloud builds (PRODUCT_NAME != default) ship home-cloud.json instead — the
+# Hosted copy talks about "your dedicated stack", otlp.<your-stack> endpoints
+# and the Hosted tab, all wrong for a shared Cloud tenant (owner, 2026-07-10).
 COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
+COPY dashboards/home-cloud.json /tmp/skin/home-cloud.json
+RUN if [ "${PRODUCT_NAME}" != "Dartastic Hosted" ]; then \
+      cp /tmp/skin/home-cloud.json ${GF_PUBLIC}/dashboards/home.json; \
+    fi
 
 # --- De-brand outbound alert-notification emails ---
 # Same patch-and-assert block as ../Dockerfile (see the long rationale there);
@@ -161,6 +168,13 @@ RUN set -eux; \
       || (echo "ERROR: index.html title patch no-op'd — upstream template changed. See skin/Dockerfile.grafana" >&2 && exit 1); \
     grep -q "public/js/dartastic-skin.js" "$INDEX" \
       || (echo "ERROR: index.html JS injection no-op'd — </body> not found?" >&2 && exit 1)
+
+# Guard: custom.ini disables the `splashScreen` feature toggle (the "What's
+# new" modal whose Assistant slide our text rewrite would rebrand — a Grafana
+# Labs brand/feature we must never claim). If a Grafana bump renames the
+# toggle this build FAILS instead of silently resurfacing the popup.
+RUN grep -qa splashScreen /usr/share/grafana/bin/grafana \
+      || (echo "ERROR: 'splashScreen' feature toggle missing from the Grafana binary — the What's-new kill in conf/custom.ini no longer works. Find the new gate before shipping." >&2 && exit 1)
 
 # Back to the upstream image's unprivileged user + stock entrypoint.
 USER grafana

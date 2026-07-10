@@ -224,6 +224,59 @@
     }
   }
 
+  // ===== Dartastic dashboards in the nav (owner spec 2026-07-10) ==========
+  // The MegaMenu's "Dashboards" item only expands to Grafana's static pages
+  // (Playlists/Snapshots/…), so the actual Dartastic dashboards are invisible
+  // until you click through. Inject the org's dashboards (the reconciler /
+  // provisioner bakes them into every tenant/box org) as links directly under
+  // the Dashboards item. Same idempotent-DOM-surgery pattern as
+  // buildOtherGroup: re-applied on observer ticks, converges, never throws.
+  // Org-scoped /api/search runs under the session, so each Cloud tenant only
+  // ever sees its own org's dashboards; the quarantine org lists none → no-op.
+  let dashListCache = null;   // null = not fetched; [] = fetched, none
+  let dashListFetching = false;
+
+  function fetchDashList() {
+    if (dashListCache !== null || dashListFetching) return;
+    dashListFetching = true;
+    fetch('/api/search?type=dash-db&limit=12', {credentials: 'same-origin'})
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        dashListCache = (Array.isArray(rows) ? rows : [])
+          .filter((d) => d && d.url && d.title)
+          .slice(0, 12);
+        buildNavDashList();
+      })
+      .catch(() => { dashListCache = []; })
+      .finally(() => { dashListFetching = false; });
+  }
+
+  function buildNavDashList() {
+    try {
+      if (dashListCache === null) { fetchDashList(); return; }
+      if (dashListCache.length === 0) return;
+      const dash = document.querySelector('a[href$="/dashboards"]');
+      const li = dash && dash.closest('li');
+      if (!li) return; // nav not rendered yet
+      if (li.querySelector(':scope > ul[data-dartastic-dashlist]')) return; // settled
+      const sub = document.createElement('ul');
+      sub.setAttribute('data-dartastic-dashlist', '');
+      sub.className = 'dartastic-nav-dashlist';
+      for (const d of dashListCache) {
+        const item = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = d.url;
+        a.textContent = d.title;
+        a.className = 'dartastic-nav-dashlink';
+        item.appendChild(a);
+        sub.appendChild(item);
+      }
+      li.appendChild(sub);
+    } catch (_e) {
+      // Never let nav surgery break the page.
+    }
+  }
+
   // ===== AGPL §13 source-offer footer =====================================
   // §13 requires the modified program to "prominently offer all users
   // interacting with it remotely … an opportunity to receive the
@@ -362,6 +415,7 @@
       // navigation, so the moved items reappear at top-level until we move
       // them back. buildOtherGroup() is idempotent (no-op once settled).
       buildOtherGroup();
+      buildNavDashList();
     });
     observer.observe(document.body, {
       childList: true, subtree: true,
