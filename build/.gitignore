@@ -11,3 +11,10 @@ reference-demo-dashboards/
 # the Dockerfile's stage-1 `dart compile exe`.  Regenerated each
 # build; the source-of-truth lives at hosted/ai-gateway/.
 ai-gateway/
+# Staged AI Grafana plugin source (rsynced from ../grafana-plugins/
+# dartastic-ai-panel/) for the Dockerfile's npm build stage. Same deal as
+# ai-gateway/ above — this one was tracked by mistake when the plugin landed,
+# so the committed copy went stale the moment the real source moved, and every
+# build dirtied the tree re-staging it. Source of truth is
+# hosted/grafana-plugins/dartastic-ai-panel/.
+ai-plugin/

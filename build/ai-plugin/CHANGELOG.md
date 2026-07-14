@@ -6,6 +6,16 @@ All notable changes to this plugin live here.  Follows
 ## [Unreleased]
 
 ### Added
+- **P1.H**: First-run consent gate (`src/consent.ts` +
+  `ConsentGate` component in the panel).  The first time the
+  panel renders in any browser, it shows a card with the legal
+  disclaimer + Dartastic AI's three load-bearing properties
+  (suggestions advisory, no training on customer telemetry,
+  every answer grounded).  "I understand" persists the
+  acknowledgement to localStorage under
+  `dartastic-ai-panel.consent-v1` and the panel flips to the
+  composer.  Subsequent renders skip the gate.  Versioned key
+  so a material wording change can re-prompt every browser.
 - **P1.E**: RAG context assembly in `src/rag.ts`.  Trace-id-shaped
   hex tokens in the question (16 or 32 chars, word-bounded) are
   extracted and fetched from box-local Tempo via Grafana's data-
