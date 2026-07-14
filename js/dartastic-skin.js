@@ -167,6 +167,14 @@
   // The anchor is the top-level item <a href> set below; if Grafana renames
   // routes or restructures the nav <ul>, update OTHER_PREFIXES / the nav-list
   // lookup. Failure mode is a no-op (group just doesn't appear), never a throw.
+  // The ONLY legitimate home for injected nav items: the MegaMenu container
+  // (Grafana's stable e2e selector, NavMenu.Menu). Anchoring on a bare
+  // a[href$="/dashboards"] was the stuck-menu bug: with the drawer closed,
+  // the first match is the BREADCRUMB's Dashboards link, so the list was
+  // injected into the breadcrumb bar and floated over the page (owner
+  // reports 2026-07-12).
+  const MEGA_MENU = '[data-testid="data-testid navigation mega-menu"]';
+
   const OTHER_PREFIXES = ['/alerting', '/connections', '/admin', '/bookmarks'];
   const OTHER_COLLAPSE_KEY = 'dartastic.nav.other.collapsed';
 
@@ -179,8 +187,10 @@
 
   function buildOtherGroup() {
     try {
-      // Anchor on the stable Dashboards item; its <ul> is the nav list.
-      const dash = document.querySelector('a[href$="/dashboards"]');
+      // Anchor on the stable Dashboards item INSIDE the MegaMenu (a bare
+      // href match can hit the breadcrumb's Dashboards link when the menu
+      // is closed — the stuck-menu bug's sibling).
+      const dash = document.querySelector(MEGA_MENU + ' a[href$="/dashboards"]');
       const seedLi = dash && dash.closest('li');
       const ul = seedLi && seedLi.parentElement;
       if (!ul || ul.tagName !== 'UL') return; // nav not rendered yet
@@ -251,13 +261,22 @@
       .finally(() => { dashListFetching = false; });
   }
 
+  // Remove any injected list living outside the (current) MegaMenu — covers
+  // menu close, re-render, and the historical breadcrumb strays.
+  function cleanupNavDashLists() {
+    document.querySelectorAll('ul[data-dartastic-dashlist]').forEach((ul) => {
+      if (!ul.isConnected || !ul.closest(MEGA_MENU)) ul.remove();
+    });
+  }
+
   function buildNavDashList() {
     try {
+      cleanupNavDashLists();
       if (dashListCache === null) { fetchDashList(); return; }
       if (dashListCache.length === 0) return;
-      const dash = document.querySelector('a[href$="/dashboards"]');
+      const dash = document.querySelector(MEGA_MENU + ' a[href$="/dashboards"]');
       const li = dash && dash.closest('li');
-      if (!li) return; // nav not rendered yet
+      if (!li) return; // menu not open
       if (li.querySelector(':scope > ul[data-dartastic-dashlist]')) return; // settled
       const sub = document.createElement('ul');
       sub.setAttribute('data-dartastic-dashlist', '');
