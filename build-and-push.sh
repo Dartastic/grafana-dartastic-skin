@@ -18,9 +18,10 @@
 #     track as production unless you explicitly bump.
 #
 #   - SKIN_REV defaults to the next integer past the highest existing
-#     `<UPSTREAM_TAG>-d<N>` tag on GHCR.  So if `d9` is the newest
-#     `0.28.0-d<N>` already pushed, this build is `d10`.  Talks to
-#     https://ghcr.io/v2/.../tags/list using GHCR_USER + CR_PAT.
+#     `<UPSTREAM_TAG>-d<N>` tag ON GHCR — never off the compose pin, which lags
+#     (CI pushes a rev per merge to main; the pin moves only when a human
+#     promotes it). No credentials, no discovery, no build: a guessed rev
+#     republishes a live image instead of erroring. See lib/ghcr-rev.sh.
 #
 #   - This does NOT rewrite any compose file. To make a build the fleet default,
 #     bump the `${LGTM_TAG:-<tag>}` pin in docker-compose.dartastic.yml, commit
@@ -30,17 +31,19 @@
 # Override either default if you want to:
 #
 #   UPSTREAM_TAG=0.29.0 ./build-and-push.sh        # bumping upstream
-#   SKIN_REV=99 ./build-and-push.sh                # forcing a rev
+#   SKIN_REV=99 ./build-and-push.sh                # forcing a rev (must be free)
 #   PUSH=0 ./build-and-push.sh                     # local-only build
 #   NO_COMPOSE_BUMP=1 ./build-and-push.sh          # accepted no-op (back-compat)
 #
 # Prereqs:
 #   - docker buildx multi-arch builder (linux/amd64,linux/arm64)
 #   - jq, curl on $PATH
-#   - GHCR write token in $CR_PAT (or GHCR_PAT), read:packages min
-#   - GHCR_USER (your GitHub username; usually pre-set by `gh auth`)
-#   - Easiest is to run via Doppler so both land:
+#   - GHCR_USER + GHCR_DEPLOY_PAT (read:packages min). Doppler hosted/prd has
+#     both under exactly those names — just run under it:
 #       doppler run -p hosted -c prd -- ./build-and-push.sh
+#     (CR_PAT is also accepted; that's the name CI injects. For months the
+#      scripts read ONLY CR_PAT while Doppler shipped GHCR_DEPLOY_PAT, so the
+#      documented local invocation silently authenticated as nobody.)
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -81,90 +84,38 @@ if [[ -z "${UPSTREAM_TAG:-}" ]]; then
       | sed -E "s|.*${IMAGE}:||; s|[\"' ].*\$||; s|^\\\$\\{[A-Za-z_]+:-||; s|\\}.*\$||; s|-d[0-9]+\$||")
   fi
   if [[ -z "${UPSTREAM_TAG:-}" ]]; then
-    echo "warn: couldn't parse UPSTREAM_TAG from $COMPOSE_FILE — defaulting to 'latest'." >&2
-    echo "      For a production-track build, pass UPSTREAM_TAG=<x.y.z> explicitly." >&2
-    UPSTREAM_TAG="latest"
-  else
-    echo "==> Auto-discovered UPSTREAM_TAG=$UPSTREAM_TAG (from $COMPOSE_FILE)"
+    # Was: default to "latest". That builds the skin against a MOVING upstream
+    # and tags it `latest-d<N>` — a tag no compose file pins and no operator
+    # asked for. Same family as the rev fallbacks: guess something plausible
+    # rather than stop. Stop.
+    echo "FATAL: couldn't parse the lgtm-skinned pin out of $COMPOSE_FILE." >&2
+    echo "       Pass UPSTREAM_TAG=<x.y.z> explicitly, or fix the pin line." >&2
+    exit 1
   fi
+  echo "==> Auto-discovered UPSTREAM_TAG=$UPSTREAM_TAG (from $COMPOSE_FILE)"
 fi
 
-# ── 2. Auto-discover SKIN_REV from GHCR ─────────────────────────
-# Hit the registry's tag-list endpoint with a bearer token minted
-# from CR_PAT.  Find the highest existing <UPSTREAM_TAG>-d<N>.  Next
-# build is N+1.  Falls back to 1 if no prior build exists.  Env-set
-# SKIN_REV always wins.
-discover_next_skin_rev() {
-  local upstream="$1"
-  local user="${GHCR_USER:-}"
-  local pat="${CR_PAT:-${GHCR_PAT:-}}"
+# ── 2. Pick SKIN_REV against GHCR — the registry is the only truth ──
+# See lib/ghcr-rev.sh for why every failure here is fatal and why the tag is
+# checked for freedom even when the operator passed SKIN_REV by hand. Short
+# version: an unverified rev doesn't error, it republishes a live image.
+# NOTE the compose pin is NOT the current rev — CI pushes a rev per merge, so
+# GHCR runs ahead of the pin. Never derive SKIN_REV from the compose file.
+source "$SCRIPT_DIR/lib/ghcr-rev.sh"
 
-  if [[ -z "$user" || -z "$pat" ]]; then
-    echo "warn: GHCR_USER / CR_PAT not set — can't auto-discover SKIN_REV." >&2
-    echo "      Pass SKIN_REV explicitly, or run via Doppler:" >&2
-    echo "        doppler run -p hosted -c prd -- $0" >&2
-    echo "1"
-    return 0
-  fi
-
-  # Discovery MUST query the same namespace we push to ($REGISTRY). It used
-  # to hardcode the pre-migration `dartastic` namespace while pushing to
-  # `dartastic-io` (the same split-namespace bug the REGISTRY comment above
-  # records fixing on the push side) — so in CI the tag list came back denied,
-  # the fallback below said "1", and every build silently REBUILT d1 IN PLACE
-  # instead of incrementing (2026-07-05 fleet-roll failure: compose pinned a
-  # -dN that was never minted).
-  local ns="${REGISTRY#ghcr.io/}"
-
-  # GHCR requires a bearer token even for private package reads.
-  # Mint one scoped to read this specific repo.
-  local token
-  token=$(curl -sS --max-time 10 -u "${user}:${pat}" \
-    "https://ghcr.io/token?service=ghcr.io&scope=repository:${ns}/${IMAGE}:pull" \
-    2>/dev/null | jq -r '.token // empty')
-
-  if [[ -z "$token" ]]; then
-    echo "FATAL: GHCR token mint failed with creds set — refusing the rev-1" >&2
-    echo "       fallback (it would overwrite ${upstream}-d1 in place)." >&2
-    echo "       Check CR_PAT scope (needs read:packages), or pass SKIN_REV." >&2
-    return 1
-  fi
-
-  local tags_json
-  tags_json=$(curl -sS --max-time 10 \
-    -H "Authorization: Bearer $token" \
-    "https://ghcr.io/v2/${ns}/${IMAGE}/tags/list" \
-    2>/dev/null || echo '{}')
-
-  # A denied/errored response ({"errors":...}) has no .tags — jq below would
-  # quietly turn that into rev 1. First-ever build (404, no package yet) is
-  # the ONLY legitimate empty; distinguish it loudly via SKIN_REV=1.
-  if ! jq -e '.tags | type == "array"' >/dev/null 2>&1 <<<"$tags_json"; then
-    echo "FATAL: GHCR tag list for ${ns}/${IMAGE} unusable — refusing the rev-1" >&2
-    echo "       fallback (it would overwrite ${upstream}-d1 in place)." >&2
-    echo "       First-ever build? Pass SKIN_REV=1 explicitly. Response was:" >&2
-    echo "       $(head -c 300 <<<"$tags_json")" >&2
-    return 1
-  fi
-
-  # Find max N in <upstream>-d<N>; emit N+1, or 1 if none exist.
-  local max
-  max=$(echo "$tags_json" | jq -r --arg up "$upstream" \
-    '[.tags[]? | capture("^" + $up + "-d(?<n>[0-9]+)$") | .n | tonumber] | max // 0')
-
-  if [[ -z "$max" || "$max" == "null" ]]; then
-    echo "1"
-  else
-    echo "$((max + 1))"
-  fi
-}
+NS="${REGISTRY#ghcr.io/}"
+GHCR_TOKEN="$(ghcr_token "$NS" "$IMAGE")"
+GHCR_TAGS="$(ghcr_tags "$NS" "$IMAGE" "$GHCR_TOKEN")"
 
 if [[ -z "${SKIN_REV:-}" ]]; then
-  SKIN_REV=$(discover_next_skin_rev "$UPSTREAM_TAG")
-  echo "==> Auto-discovered SKIN_REV=$SKIN_REV (next after newest ${UPSTREAM_TAG}-d<N> on GHCR)"
+  SKIN_REV="$(ghcr_next_skin_rev "$UPSTREAM_TAG" "$GHCR_TAGS")"
+  echo "==> SKIN_REV=$SKIN_REV (next after the newest ${UPSTREAM_TAG}-d<N> on GHCR)"
+else
+  echo "==> SKIN_REV=$SKIN_REV (operator-supplied — verifying it's actually free)"
 fi
 
 TAG="${UPSTREAM_TAG}-d${SKIN_REV}"
+ghcr_assert_tag_free "$NS" "$IMAGE" "$TAG" "$GHCR_TAGS"
 FULL="${REGISTRY}/${IMAGE}:${TAG}"
 LATEST="${REGISTRY}/${IMAGE}:latest"
 

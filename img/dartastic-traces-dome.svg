@@ -1,0 +1,12 @@
+<!--
+  Dartastic traces datasource icon — dome mark, true vector (owner-supplied,
+  2026-07-13). Source of truth: dartastic.io/src/assets/img/dartastic-traces-dome.svg.
+  Replaces the upstream Grafana Labs datasource logo in the skin; the
+  "Dartastic" string here is what Dockerfile.grafana's de-brand guard asserts.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <path d="M36 190 A 92 92 0 0 1 220 190" fill="none" stroke="#1C8CFF" stroke-width="24" stroke-linecap="round"></path>
+  <rect x="84" y="130" width="58" height="16" rx="8" fill="#1C8CFF"></rect>
+  <rect x="112" y="156" width="64" height="16" rx="8" fill="#1C8CFF"></rect>
+  <rect x="140" y="182" width="56" height="16" rx="8" fill="#1C8CFF"></rect>
+</svg>

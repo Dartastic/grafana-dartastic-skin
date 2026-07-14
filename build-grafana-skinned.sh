@@ -8,8 +8,11 @@
 #   UPSTREAM_TAG=13.1.0 ./build-grafana-skinned.sh
 #   SKIN_REV=1 PUSH=0 ./build-grafana-skinned.sh   # first/local build
 #
-# Prereqs: docker buildx, jq, curl, python3; CR_PAT + GHCR_USER for push/rev
-# discovery (doppler run -p hosted -c prd -- ./build-grafana-skinned.sh).
+# Prereqs: docker buildx, jq, curl, python3, and GHCR creds for rev discovery +
+# push. Doppler hosted/prd carries GHCR_USER + GHCR_DEPLOY_PAT, so:
+#   doppler run -p hosted -c prd -- ./build-grafana-skinned.sh
+# Rev discovery is mandatory (no creds = no build): see lib/ghcr-rev.sh for the
+# three times a guessed rev silently overwrote a published image.
 #
 # After a green build, run the brand-scan gate against it:
 #   cd brand-scan && IMAGE=ghcr.io/dartastic-io/grafana-skinned:<tag> ./run-local.sh
@@ -35,46 +38,26 @@ need_cmd() {
 }
 need_cmd docker; need_cmd jq; need_cmd curl; need_cmd python3
 
-# ── SKIN_REV auto-discovery (same GHCR logic as build-and-push.sh) ──
-discover_next_skin_rev() {
-  local upstream="$1"
-  local user="${GHCR_USER:-}"
-  local pat="${CR_PAT:-${GHCR_PAT:-}}"
-  if [[ -z "$user" || -z "$pat" ]]; then
-    echo "warn: GHCR_USER / CR_PAT not set — can't auto-discover SKIN_REV." >&2
-    echo "1"; return 0
-  fi
-  local ns="${REGISTRY#ghcr.io/}"
-  local token
-  token=$(curl -sS --max-time 10 -u "${user}:${pat}" \
-    "https://ghcr.io/token?service=ghcr.io&scope=repository:${ns}/${IMAGE}:pull" \
-    2>/dev/null | jq -r '.token // empty')
-  if [[ -z "$token" ]]; then
-    echo "FATAL: GHCR token mint failed with creds set — refusing the rev-1 fallback." >&2
-    return 1
-  fi
-  local tags_json
-  tags_json=$(curl -sS --max-time 10 -H "Authorization: Bearer $token" \
-    "https://ghcr.io/v2/${ns}/${IMAGE}/tags/list" 2>/dev/null || echo '{}')
-  if ! jq -e '.tags | type == "array"' >/dev/null 2>&1 <<<"$tags_json"; then
-    # First-ever build of this image (404, no package) is expected — but make
-    # the operator say so, same guard as build-and-push.sh.
-    echo "FATAL: GHCR tag list for ${ns}/${IMAGE} unusable. First-ever build?" >&2
-    echo "       Pass SKIN_REV=1 explicitly. Response: $(head -c 200 <<<"$tags_json")" >&2
-    return 1
-  fi
-  local max
-  max=$(echo "$tags_json" | jq -r --arg up "$upstream" \
-    '[.tags[]? | capture("^" + $up + "-d(?<n>[0-9]+)$") | .n | tonumber] | max // 0')
-  echo "$((max + 1))"
-}
+# ── Pick SKIN_REV against GHCR — the registry is the only truth ──
+# Shared with build-and-push.sh: this file used to carry its own copy of the
+# discovery logic, which is how it kept the "no creds => rev 1" fallback months
+# after the other script grew guards against it. One implementation now; see
+# lib/ghcr-rev.sh for the three in-place overwrites that bought these rules.
+source "$SCRIPT_DIR/lib/ghcr-rev.sh"
+
+NS="${REGISTRY#ghcr.io/}"
+GHCR_TOKEN="$(ghcr_token "$NS" "$IMAGE")"
+GHCR_TAGS="$(ghcr_tags "$NS" "$IMAGE" "$GHCR_TOKEN")"
 
 if [[ -z "${SKIN_REV:-}" ]]; then
-  SKIN_REV=$(discover_next_skin_rev "$UPSTREAM_TAG")
-  echo "==> Auto-discovered SKIN_REV=$SKIN_REV (next after newest ${UPSTREAM_TAG}-d<N> on GHCR)"
+  SKIN_REV="$(ghcr_next_skin_rev "$UPSTREAM_TAG" "$GHCR_TAGS")"
+  echo "==> SKIN_REV=$SKIN_REV (next after the newest ${UPSTREAM_TAG}-d<N> on GHCR)"
+else
+  echo "==> SKIN_REV=$SKIN_REV (operator-supplied — verifying it's actually free)"
 fi
 
 TAG="${UPSTREAM_TAG}-d${SKIN_REV}"
+ghcr_assert_tag_free "$NS" "$IMAGE" "$TAG" "$GHCR_TAGS"
 FULL="${REGISTRY}/${IMAGE}:${TAG}"
 LATEST="${REGISTRY}/${IMAGE}:latest"
 

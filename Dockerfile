@@ -101,6 +101,25 @@ COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo-light.svg
 COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo_dark.svg
 COPY img/grafana_typelogo.svg   ${GF_PUBLIC}/img/grafana_text_logo_light.svg
 
+# Datasource-type logos — same block as Dockerfile.grafana (see the rationale
+# there); the otel-lgtm image carries the identical plugin layout, so hosted
+# boxes were still rendering the Tempo flame in Explore's picker while the
+# discrete stack was already clean. Traces/Logs get their dome marks; Profiles
+# and the built-in "-- Dartastic --" datasource get the heart.
+COPY img/dartastic-traces-dome.svg ${GF_PUBLIC}/app/plugins/datasource/tempo/img/tempo_logo.svg
+COPY img/dartastic-traces-dome.svg ${GF_PUBLIC}/app/plugins/datasource/tempo/dist/img/tempo_logo.svg
+COPY img/dartastic-logs-dome.svg   ${GF_PUBLIC}/app/plugins/datasource/loki/img/loki_icon.svg
+COPY img/dartastic-logs-dome.svg   ${GF_PUBLIC}/app/plugins/datasource/loki/dist/img/loki_icon.svg
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/app/plugins/datasource/grafana-pyroscope-datasource/img/grafana_pyroscope_icon.svg
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/app/plugins/datasource/grafana-pyroscope-datasource/dist/img/grafana_pyroscope_icon.svg
+COPY img/grafana_icon.svg       ${GF_PUBLIC}/app/plugins/datasource/grafana/img/icn-grafanadb.svg
+RUN for f in \
+      ${GF_PUBLIC}/app/plugins/datasource/tempo/dist/img/tempo_logo.svg \
+      ${GF_PUBLIC}/app/plugins/datasource/loki/dist/img/loki_icon.svg \
+      ${GF_PUBLIC}/app/plugins/datasource/grafana-pyroscope-datasource/dist/img/grafana_pyroscope_icon.svg; do \
+      grep -q Dartastic "$f" || (echo "ERROR: $f not de-branded — Grafana plugin dist/ layout changed" >&2 && exit 1); \
+    done
+
 # Stage the same files under /tmp so the next RUN can glob-overwrite
 # the webpack-hashed copies in build/static/img/.
 COPY img/grafana_icon.svg       /tmp/skin/grafana_icon.svg
