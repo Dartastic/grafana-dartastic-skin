@@ -79,6 +79,18 @@ ghcr_tags() {
   body=$(curl -sS --max-time 10 -H "Authorization: Bearer $token" \
     "https://ghcr.io/v2/${ns}/${image}/tags/list" 2>/dev/null || echo '{}')
 
+  # A package that doesn't exist yet (the first-ever build of an image) answers
+  # NAME_UNKNOWN with no `.tags` array. That is an unambiguous "zero tags", NOT
+  # an unreadable response — return empty so a first build proceeds:
+  # assert-image-tag-free sees the tag as free, and ghcr_next_skin_rev still
+  # refuses to guess (its own empty-tags guard fatals with "pass SKIN_REV=1").
+  # Any OTHER non-array body (auth failure, malformed, network) stays fatal —
+  # guessing there is exactly the rev-1-fallback bug this file guards against.
+  if jq -e '(.errors // [])[] | select(.code == "NAME_UNKNOWN")' \
+       >/dev/null 2>&1 <<<"$body"; then
+    return 0
+  fi
+
   if ! jq -e '.tags | type == "array"' >/dev/null 2>&1 <<<"$body"; then
     echo "FATAL: GHCR tag list for ${ns}/${image} unusable — refusing to guess." >&2
     echo "       If this is the first-ever build of this image, pass SKIN_REV=1." >&2
