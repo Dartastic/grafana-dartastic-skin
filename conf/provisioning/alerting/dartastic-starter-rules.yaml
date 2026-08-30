@@ -211,8 +211,8 @@ groups:
               datasource: { type: prometheus, uid: prometheus }
               editorMode: code
               expr: >-
-                max(system_filesystem_usage_bytes{state="used",mount="/"})
-                / clamp_min(max(system_filesystem_usage_bytes{state="used",mount="/"}) + max(system_filesystem_usage_bytes{state="free",mount="/"}), 1)
+                max(system_filesystem_usage_bytes{system_filesystem_state="used",mount="/"})
+                / clamp_min(max(system_filesystem_usage_bytes{system_filesystem_state="used",mount="/"}) + max(system_filesystem_usage_bytes{system_filesystem_state="free",mount="/"}), 1)
               instant: false
               range: true
               intervalMs: 30000

@@ -47,7 +47,15 @@ RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
 FROM node:20-slim AS ai-plugin-build
 WORKDIR /plugin
 COPY build/ai-plugin/ /plugin/
-RUN npm install --no-audit --no-fund
+# `npm ci`, against a COMMITTED lockfile. This was `npm install` with no lock,
+# so every image build re-resolved floating ranges against whatever the
+# registry held that minute — and on 2026-08-30 it stopped resolving at all
+# (ERESOLVE: "Found: webpack@undefined", peer webpack from
+# copy-webpack-plugin@12.0.2), taking the whole skin image down. Nothing in
+# this repo had changed; the registry had. A build that can break without a
+# commit cannot be reasoned about, and this image is how boxes get their
+# dashboards.
+RUN npm ci --no-audit --no-fund
 RUN npm run build
 
 # --- Stage 2: the skinned LGTM image (the deployable) ---
