@@ -71,6 +71,44 @@ ARG UPSTREAM_TAG
 # browser) under /otel-lgtm/grafana/public/.
 ARG GF_PUBLIC=/otel-lgtm/grafana/public
 
+# --- Span-metrics dimensions (hosted#313) ---------------------------
+# Upstream otel-lgtm dimensions span metrics on the three intrinsics
+# only — service_name, operation, status_code. Every Dartastic dashboard
+# card that filters or splits on app_build_id, dartastic_exception_type,
+# device_model_identifier or the jank attribution flags was therefore
+# reading a label the box never emits: the Crashes "Affected versions"
+# and "Affected devices" cards, the Flutter App Health named-attribution
+# rate, all of it. Empty, on every Hosted box, with nothing red — a
+# trial customer opens Crashes on day one and sees blanks.
+#
+# Cloud declares these in config/cloud/tempo.yaml; the box's Tempo config
+# is baked into the upstream image, so it gets the same list patched in
+# here. The two must stay identical or a dashboard stops being portable
+# between Hosted and Cloud.
+#
+# Guarded the way every other upstream patch in this file is: if the
+# anchor line moves, FAIL THE BUILD rather than ship an image whose
+# dashboards are quietly empty. `status_code` appears exactly once in
+# upstream's config, which is what makes it a safe anchor.
+RUN set -eux; \
+    cfg=/otel-lgtm/tempo-config.yaml; \
+    if ! grep -q '^        - status_code$' "$cfg"; then \
+      echo "FATAL: tempo-config span_metrics dimensions block moved — upstream reworded?" >&2; \
+      exit 1; \
+    fi; \
+    sed -i 's@^        - status_code$@        - status_code\n\
+        - app.build_id\n\
+        - dartastic.exception.type\n\
+        - device.model.identifier\n\
+        - dartastic.jank.attribution.app_frame.resolved\n\
+        - dartastic.jank.attribution.symbols_resolved\n\
+        - app.screen.name@' "$cfg"; \
+    for d in app.build_id dartastic.exception.type device.model.identifier \
+             dartastic.jank.attribution.app_frame.resolved \
+             dartastic.jank.attribution.symbols_resolved app.screen.name; do \
+      grep -q -- "- $d\$" "$cfg" || { echo "FATAL: dimension $d did not land" >&2; exit 1; }; \
+    done
+
 # --- Image assets: logos, favicons, login backgrounds ---
 # Two locations get our overrides:
 #
