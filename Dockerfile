@@ -109,6 +109,34 @@ RUN set -eux; \
       grep -q -- "- $d\$" "$cfg" || { echo "FATAL: dimension $d did not land" >&2; exit 1; }; \
     done
 
+# --- Exemplar → trace links -----------------------------------------
+# An exemplar is the jump from "p99 got worse" to the exact trace that was
+# slow. Grafana renders that link only when a Prometheus datasource
+# declares which exemplar LABEL carries the trace id.
+#
+# Upstream declares `trace_id`. Upstream's own Tempo metrics-generator
+# emits `traceID`. They do not match, so on a stock box the exemplars are
+# stored, are returned by /api/v1/query_exemplars, and are not clickable
+# anywhere — verified on rice-19, where every exemplar label key in an
+# hour of data was `traceID` and nothing else.
+#
+# Declare BOTH. `traceID` is what Tempo's span metrics write; `trace_id`
+# is what an OTLP metric exemplar carries through Prometheus remote-write,
+# which is the shape the Dart SDK's own exemplars will arrive in. Keeping
+# both means one image serves both sources.
+RUN set -eux; \
+    ds=/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml; \
+    if ! grep -q '^        - name: trace_id$' "$ds"; then \
+      echo "FATAL: exemplarTraceIdDestinations block moved — upstream reworded?" >&2; \
+      exit 1; \
+    fi; \
+    sed -i 's@^        - name: trace_id$@        - name: traceID\n\
+          datasourceUid: tempo\n\
+          urlDisplayLabel: "Trace: $${__value.raw}"\n\
+        - name: trace_id@' "$ds"; \
+    grep -q '^        - name: traceID$' "$ds" || { echo "FATAL: traceID destination did not land" >&2; exit 1; }; \
+    grep -q '^        - name: trace_id$' "$ds" || { echo "FATAL: trace_id destination was lost" >&2; exit 1; }
+
 # --- Image assets: logos, favicons, login backgrounds ---
 # Two locations get our overrides:
 #
