@@ -109,6 +109,39 @@ RUN set -eux; \
       grep -q -- "- $d\$" "$cfg" || { echo "FATAL: dimension $d did not land" >&2; exit 1; }; \
     done
 
+# --- Stack traces longer than 2KB ------------------------------------
+# Tempo silently shortens any attribute value over 2048 bytes. No error, no
+# log, no marker on the span — the trace just arrives shorter than it left.
+# For this product that lands on exactly the wrong two attributes:
+# exception.stacktrace and dartastic.jank.stack.frames, both of which the box
+# symbolizes at ingest (#311).
+#
+# Verified on rice-19 before writing this: tempo-config.yaml sets no value, so
+# the box takes the 2048 default, and /status/config confirms it live. Cloud
+# hit it first — a Pixel exception arrived cut mid-frame at exactly 2048 bytes
+# — and the box runs the same default, so the box loses the same frames.
+#
+# Same value and reasoning as config/cloud/tempo.yaml: ~25-30KB for a deep
+# symbolized stack, 64KB for headroom. The two must stay identical, for the
+# same portability reason as the span-metrics dimensions above.
+#
+# Guarded like every other patch here: `distributor:` is a top-level key that
+# appears exactly once, and if it ever moves this FAILS THE BUILD rather than
+# shipping an image that quietly truncates.
+RUN set -eux; \
+    cfg=/otel-lgtm/tempo-config.yaml; \
+    if [ "$(grep -c '^distributor:$' "$cfg")" != "1" ]; then \
+      echo "FATAL: tempo-config distributor block moved — upstream reworded?" >&2; \
+      exit 1; \
+    fi; \
+    if grep -q '^  max_attribute_bytes:' "$cfg"; then \
+      echo "FATAL: upstream now sets max_attribute_bytes — reconcile before overriding" >&2; \
+      exit 1; \
+    fi; \
+    sed -i 's@^distributor:$@distributor:\n  max_attribute_bytes: 65536@' "$cfg"; \
+    grep -q '^  max_attribute_bytes: 65536$' "$cfg" \
+      || { echo "FATAL: max_attribute_bytes did not land" >&2; exit 1; }
+
 # --- Exemplar → trace links -----------------------------------------
 # An exemplar is the jump from "p99 got worse" to the exact trace that was
 # slow. Grafana renders that link only when a Prometheus datasource
