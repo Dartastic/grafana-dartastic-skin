@@ -55,6 +55,15 @@ extensions:
 
 processors:
   batch:
+  # Same fix as Cloud (config/cloud/otelcol-cloud.yaml): Loki's OTLP ingest
+  # drops the record-level event_name, so it rides as an attribute and
+  # becomes structured metadata (event_name) a LogQL filter can see.
+  transform/event_name:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["event.name"], event_name) where event_name != ""
 
 exporters:
   otlp_http/metrics:
@@ -94,7 +103,7 @@ service:
       exporters: [otlp_http/metrics]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: [transform/event_name, batch]
       exporters: [otlp_http/logs]
     profiles:
       receivers: [otlp]
