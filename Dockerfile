@@ -102,10 +102,14 @@ RUN set -eux; \
         - device.model.identifier\n\
         - dartastic.jank.attribution.app_frame.resolved\n\
         - app.screen.name\n\
-        - app.start.type@' "$cfg"; \
+        - app.start.type\n\
+        - dartastic.network.flaky\n\
+        - dartastic.network.flaky.reason\n\
+        - network.connectivity@' "$cfg"; \
     for d in app.build_id dartastic.exception.type device.model.identifier \
              dartastic.jank.attribution.app_frame.resolved app.screen.name \
-             app.start.type; do \
+             app.start.type dartastic.network.flaky dartastic.network.flaky.reason \
+             network.connectivity; do \
       grep -q -- "- $d\$" "$cfg" || { echo "FATAL: dimension $d did not land" >&2; exit 1; }; \
     done
 
