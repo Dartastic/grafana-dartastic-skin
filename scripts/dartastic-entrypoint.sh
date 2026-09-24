@@ -67,21 +67,30 @@ fi
 # already; this no-ops.
 if [[ "$USE_DOPPLER" == "true" ]]; then
   eval "$(doppler secrets download --no-file --format env-no-quotes 2>/dev/null \
-    | grep -E '^(ANTHROPIC_API_KEY|AI_GATEWAY_)' \
+    | grep -E '^(ANTHROPIC_API_KEY|OPENAI_API_KEY|AI_GATEWAY_)' \
     | sed 's|^|export |')" || true
 fi
 
 # ── AI gateway: opt-in via env ──────────────────────────────────
 # Preconditions:
-#   1. ANTHROPIC_API_KEY must be set (the inference backend).
+#   1. A PROVIDER KEY must be set — ANTHROPIC_API_KEY or OPENAI_API_KEY.
+#      The key is the CUSTOMER's: Hosted and Self-Hosted customers add
+#      their own and turn AI on themselves (Michael, 2026-09-17), so an
+#      unconfigured box simply never starts the gateway, which is the
+#      off state and costs nothing.
 #   2. EITHER at least one AI_GATEWAY_CUSTOMER_<ID>_SECRET is set
 #      (HMAC-authenticated external callers — Shared AI tier),
 #      OR AI_GATEWAY_TRUST_LOCALHOST=true (Private AI on Box +
 #      Compliance + dogfood — Grafana panel calling over the
 #      container's internal loopback, no HMAC needed).
+#
+# Which vendor gets called, which model, and what it costs are the
+# gateway's own decisions (AI_GATEWAY_PROVIDER, AI_GATEWAY_MODEL,
+# AI_GATEWAY_PRICE_*_PER_MTOK); it exits 64 with a stated reason rather
+# than guessing any of them, and that reason lands in ai_gateway.log.
 HAS_CUSTOMER_SECRET=$(env | grep -c '^AI_GATEWAY_CUSTOMER_.*_SECRET=' || true)
 TRUST_LOCALHOST="${AI_GATEWAY_TRUST_LOCALHOST:-false}"
-if [[ -n "${ANTHROPIC_API_KEY:-}" ]] \
+if { [[ -n "${ANTHROPIC_API_KEY:-}" ]] || [[ -n "${OPENAI_API_KEY:-}" ]]; } \
    && { [[ "$HAS_CUSTOMER_SECRET" -gt 0 ]] || [[ "$TRUST_LOCALHOST" == "true" ]]; }; then
   echo "[dartastic-entrypoint] starting ai_gateway in background"
   echo "[dartastic-entrypoint]   logs: $LOG_DIR/ai_gateway.log"

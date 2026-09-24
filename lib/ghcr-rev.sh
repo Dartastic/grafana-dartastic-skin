@@ -64,7 +64,20 @@ EOF
 
   if [[ -z "$token" ]]; then
     echo "FATAL: GHCR token mint failed for ${ns}/${image} with creds set." >&2
-    echo "       Check the PAT's scope (needs read:packages)." >&2
+    # The mint returns no body worth parsing, so name every cause rather than
+    # guessing one. Guessing cost real time on 2026-09-15: this said "check
+    # the scope" and the token had ample scope — it had EXPIRED, and two
+    # people went looking at scopes for a week.
+    echo "       The PAT is set but GHCR refused it. In likelihood order:" >&2
+    echo "       1. EXPIRED — check the expiry on the token in GitHub;" >&2
+    echo "          this is the usual one and the message used to hide it." >&2
+    echo "       2. Not SSO-authorized for the ${ns} org (classic PATs need" >&2
+    echo "          'Configure SSO' -> Authorize after creation)." >&2
+    echo "       3. Revoked or regenerated without updating Doppler." >&2
+    echo "       4. Wrong scope: needs read:packages to pull, write:packages" >&2
+    echo "          to push (build-grafana-skinned pushes with this one)." >&2
+    echo "       5. Fine-grained PAT — those cannot access Packages at all;" >&2
+    echo "          it must be a CLASSIC token." >&2
     return 1
   fi
   echo "$token"
