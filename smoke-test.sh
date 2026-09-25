@@ -20,17 +20,29 @@ cleanup() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 echo "==> Starting ${IMAGE} on :${PORT}"
-docker run --rm -d --name "$CONTAINER" -p "${PORT}:3000" "$IMAGE" >/dev/null
+# ADMIN_ALERT_EMAIL: the default contact point interpolates it, and
+# Grafana refuses to start without an address. Boxes set it from Doppler.
+docker run --rm -d --name "$CONTAINER" -p "${PORT}:3000" \
+  -e ADMIN_ALERT_EMAIL=smoke-test@example.invalid "$IMAGE" >/dev/null
 
 echo -n "==> Waiting for Grafana to come up"
-for _ in $(seq 1 30); do
+# Grafana downloads its preinstalled plugins before it listens, so allow
+# several minutes, and stop here if it never comes up.
+up=0
+for _ in $(seq 1 150); do
   if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
     echo " ok"
+    up=1
     break
   fi
   echo -n "."
   sleep 2
 done
+if [[ "$up" != 1 ]]; then
+  echo " Grafana never came up; last container log lines:" >&2
+  docker logs "$CONTAINER" 2>&1 | tail -20 >&2
+  exit 1
+fi
 
 fail() { echo "  FAIL: $1" >&2; exit 1; }
 pass() { echo "  ok: $1"; }
@@ -154,5 +166,15 @@ if [[ -n "$BUILT_LOGO_NAME" ]]; then
 else
   fail "no grafana_icon.*.svg in build/static/img — upstream renamed?"
 fi
+
+# 9. The Dartastic AI plugin is REGISTERED, not just copied: Grafana
+# serves a plugin's module.js only once it has loaded the plugin.
+# (Until 2026-09-25 the image copied it to a directory this Grafana never
+# reads, and nothing noticed.)
+for plugin_id in dartastic-ai-panel dartastic-ai-panel-panel; do
+  code="$(curl -sS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/public/plugins/${plugin_id}/module.js")"
+  [[ "$code" == "200" ]] || fail "plugin ${plugin_id} not registered (module.js HTTP ${code})"
+  pass "plugin ${plugin_id} registered"
+done
 
 echo "==> All assertions passed"

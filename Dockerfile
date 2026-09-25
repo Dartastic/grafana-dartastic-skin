@@ -459,13 +459,20 @@ COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 COPY conf/otelcol-config.yaml   /otel-lgtm/otelcol-config.yaml
 
 # --- Bundle the Dartastic AI Grafana plugin (#85 P1.D) ---
-# Grafana auto-discovers plugins under /var/lib/grafana/plugins/.
+# Staged at /var/lib/grafana/plugins/, which this Grafana does NOT
+# read: upstream's run-grafana.sh points GF_PATHS_PLUGINS at
+# /data/grafana/plugins on the persistent volume, so
+# dartastic-entrypoint.sh copies the plugin there at every start.
+# Fail the build if upstream moves that path, or the copy lands
+# somewhere Grafana never looks (it did, silently, until 2026-09-25).
 # Grafana refuses to load unsigned plugins by default; the
 # `[plugins] allow_loading_unsigned_plugins` config line in
 # conf/custom.ini whitelists ours by id.  Customers on Hosted
 # never need to think about plugin signing — the bundled deploy
 # is trusted by virtue of being inside the same image.
 COPY --from=ai-plugin-build /plugin/dist/ /var/lib/grafana/plugins/dartastic-ai-panel/
+RUN grep -qx 'export GF_PATHS_PLUGINS=/data/grafana/plugins' /otel-lgtm/run-grafana.sh \
+ || { echo "upstream run-grafana.sh no longer sets GF_PATHS_PLUGINS=/data/grafana/plugins; update dartastic-entrypoint.sh" >&2; exit 1; }
 
 # Wrapper entrypoint — backgrounds the AI gateway when configured,
 # then execs the original LGTM entrypoint in the foreground (so if
