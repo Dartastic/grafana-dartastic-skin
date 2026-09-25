@@ -118,6 +118,19 @@ else
        "trust-localhost=$TRUST_LOCALHOST"
 fi
 
+# ── Install the Dartastic AI plugin where Grafana looks ─────────
+# Upstream's run-grafana.sh sets GF_PATHS_PLUGINS=/data/grafana/plugins,
+# on the persistent /data volume, so a plugin baked anywhere else is
+# never loaded and one baked there is hidden by the volume. Copy the
+# image's build in at every start so the image's version always wins.
+# The Dockerfile asserts the upstream path at build time.
+AI_PLUGIN_SRC=/var/lib/grafana/plugins/dartastic-ai-panel
+GRAFANA_PLUGINS_DIR=/data/grafana/plugins
+mkdir -p "$GRAFANA_PLUGINS_DIR"
+rm -rf "$GRAFANA_PLUGINS_DIR/dartastic-ai-panel"
+cp -a "$AI_PLUGIN_SRC" "$GRAFANA_PLUGINS_DIR/dartastic-ai-panel"
+echo "[dartastic-entrypoint] AI plugin installed in $GRAFANA_PLUGINS_DIR"
+
 # ── Hand off to LGTM ────────────────────────────────────────────
 # Upstream grafana/otel-lgtm uses `CMD ["/otel-lgtm/run-all.sh"]`
 # (verified at the upstream image tag we pin).  If we get an
