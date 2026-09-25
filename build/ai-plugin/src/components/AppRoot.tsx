@@ -15,7 +15,8 @@ export const DartasticAiAppRoot: React.FC<AppRootProps> = () => {
       <h2>Dartastic AI</h2>
       <p>
         Add a <strong>Dartastic AI</strong> panel to any dashboard
-        and start asking questions about your telemetry. The panel
+        and start asking questions about your telemetry. Only
+        organization admins can use it. The panel
         proxies to the bundled gateway at{' '}
         <code>localhost:8091</code> through Grafana's plugin proxy
         — no external network exit and no HMAC keys to manage.

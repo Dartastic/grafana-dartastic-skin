@@ -35,6 +35,22 @@ All notable changes to this plugin live here.  Follows
   range — the user has to paste the trace_id explicitly.  Smarter
   "use the active trace from this panel" plumbing is P2.
 
+## [0.2.0] - 2026-09-25
+
+### Fixed
+- The chat panel now loads. It ships as a panel plugin nested in the
+  app (`dartastic-ai-panel-panel`); before, Grafana registered only
+  the app, so dashboards showed "Panel plugin not found".
+- Requests reach the gateway. The panel calls the app's proxy route,
+  and the route matches its full path.
+- Removed a reference to an undefined name that would have stopped
+  the panel module from loading. The build now typechecks first.
+
+### Security
+- Only organization admins can use Dartastic AI. Grafana refuses
+  anyone below Admin before proxying to the gateway, and the panel
+  tells other users the AI is for admins.
+
 ## [0.1.0] - 2026-05-20
 
 ### Added

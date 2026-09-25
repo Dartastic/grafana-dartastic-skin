@@ -403,7 +403,8 @@ COPY conf/provisioning/alerting/dartastic-default.yaml  /otel-lgtm/grafana/conf/
 # box disk/CPU/memory) so a fresh box does something useful the moment a
 # destination exists — like the pre-loaded dashboards. Unrouted → falls through
 # to the default policy the reconciler maintains (#183).
-COPY conf/provisioning/alerting/dartastic-starter-rules.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-starter-rules.yaml
+COPY conf/provisioning/alerting/dartastic-starter-rules-app.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-starter-rules-app.yaml
+COPY conf/provisioning/alerting/dartastic-starter-rules-box.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-starter-rules-box.yaml
 
 # --- Template patches via sed ---
 # More robust than a unified-diff patch file across upstream version

@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { PanelProps } from '@grafana/data';
-import { getBackendSrv } from '@grafana/runtime';
+import { config, getBackendSrv } from '@grafana/runtime';
 import { useStyles2, Button, TextArea, Alert, LoadingPlaceholder } from '@grafana/ui';
 import { css } from '@emotion/css';
 
@@ -88,7 +88,7 @@ export const DartasticAiPanel: React.FC<PanelProps<DartasticAiPanelOptions>> = (
 
     try {
       const res = await getBackendSrv().fetch<GatewayAnswer | GatewayError>({
-        url: '/api/plugins/dartastic-ai-panel/resources/ai/api/v1/query',
+        url: '/api/plugin-proxy/dartastic-ai-panel/ai/api/v1/query',
         method: 'POST',
         data: { question: trimmed, context: rag.context },
         showSuccessAlert: false,
@@ -123,6 +123,20 @@ export const DartasticAiPanel: React.FC<PanelProps<DartasticAiPanelOptions>> = (
       setQuestion('');
     }
   }, [question, pending]);
+
+  // Admins only (Michael, 2026-09-25).  Grafana enforces it: the
+  // proxy route carries reqRole Admin, so a non-admin's request is
+  // refused before it reaches the gateway.  This only says why,
+  // instead of a composer that can never answer.
+  if (config.bootData.user.orgRole !== 'Admin') {
+    return (
+      <div className={styles.root} style={{ width, height }}>
+        <Alert severity="info" title="Dartastic AI is available to organization admins">
+          Ask an admin of this organization for help with your question.
+        </Alert>
+      </div>
+    );
+  }
 
   // First paint: while we don't yet know consent state (the
   // useEffect hasn't run), render nothing visible.  Cheaper than
@@ -408,11 +422,6 @@ const getConsentStyles = () => ({
     color: 'var(--text-disabled, #888)',
   }),
 });
-
-// Suppress the unused-import warning while keeping the import
-// available for future P1.E (queries Tempo via Grafana's data-
-// source proxy).
-void getDataSourceSrv;
 
 const getStyles = () => ({
   root: css({

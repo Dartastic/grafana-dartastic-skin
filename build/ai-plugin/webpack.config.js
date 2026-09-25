@@ -24,7 +24,10 @@ const CopyPlugin = require('copy-webpack-plugin');
 module.exports = (env) => ({
   mode: env && env.production ? 'production' : 'development',
   context: path.join(__dirname, 'src'),
-  entry: { module: path.join(__dirname, 'src/module.ts') },
+  entry: {
+    module: path.join(__dirname, 'src/module.ts'),
+    'panel/module': path.join(__dirname, 'src/panel/module.ts'),
+  },
   output: {
     path: path.join(__dirname, 'dist'),
     filename: '[name].js',
@@ -58,6 +61,8 @@ module.exports = (env) => ({
       patterns: [
         { from: 'plugin.json', to: '.' },
         { from: 'img', to: 'img' },
+        { from: 'panel/plugin.json', to: 'panel' },
+        { from: 'img', to: 'panel/img' },
         { from: path.join(__dirname, 'README.md'), to: '.' },
         { from: path.join(__dirname, 'LICENSE'), to: '.' },
         { from: path.join(__dirname, 'CHANGELOG.md'), to: '.' },

@@ -1,4 +1,4 @@
-# Dartastic starter alert rules (hosted#184).
+# Dartastic starter alert rules — YOUR APPS (hosted#184).
 #
 # WHY THIS EXISTS: a box shipped with a working contact point (#131/#183) but
 # ZERO rules — delivery of nothing alerts on nothing (dkatalis trial: a crash
@@ -27,6 +27,24 @@
 #    monitor the box itself and have data from day one.
 #
 # TUNING: thresholds are conservative starting points, documented per rule.
+#
+# ── WHY THIS FILE IS SPLIT ────────────────────────────────────────────────
+# These are the APP-level rules, and they are the only ones that may be given
+# to a TENANT. They are file-provisioned into org 1 here, exactly as before,
+# and ALSO API-provisioned into every tenant org by the tenant-reconciler,
+# because Grafana's file provisioning only ever reaches org 1 — on a
+# multi-tenant box every other org would otherwise have no rules at all.
+#
+# The BOX-level rules live in dartastic-starter-rules-box.yaml and stay in
+# org 1 alone. They read the box's own hostmetrics sidecar, so a tenant could
+# neither act on them nor should see them: "the box is at 95% disk" is
+# aggregate state across every tenant sharing that box.
+#
+# THIS FILE IS A CONTRACT, not just config: the tenant-reconciler parses it,
+# and byoc consumes it instead of keeping its own copy. Adding a rule here
+# ships it to every tenant on every Cloud box and to every Self-Hosted
+# install. Adding one that reads box-level metrics puts infrastructure state
+# in a customer's org. Put those in the box file.
 apiVersion: 1
 
 groups:
@@ -143,7 +161,7 @@ groups:
           description: >-
             No error/traffic spans have been received for over an hour. If your
             apps are live this usually means broken instrumentation (SDK not
-            initialised, wrong endpoint or API key). Expected to fire on a new
+            initialized, wrong endpoint or API key). Expected to fire on a new
             box until your first app connects — duplicate and pause if not
             wanted yet.
         noDataState: Alerting
@@ -182,148 +200,3 @@ groups:
                 - type: query
                   evaluator: { type: lt, params: [0] }
 
-  # ── Your box ──────────────────────────────────────────────────────────
-  - orgId: 1
-    name: Dartastic starter — box health
-    folder: Dartastic Alerts
-    interval: 1m
-    rules:
-      - uid: dartastic_starter_disk
-        title: Box disk is almost full
-        condition: C
-        for: 10m
-        labels:
-          severity: critical
-          dartastic_starter: "true"
-        annotations:
-          summary: The box root filesystem is over 85% full
-          description: >-
-            Telemetry storage lives on this disk; when it fills, ingestion
-            stops and data is lost. Free space or resize the volume.
-        noDataState: OK
-        execErrState: OK
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              refId: A
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              expr: >-
-                max(system_filesystem_usage_bytes{system_filesystem_state="used",mount="/"})
-                / clamp_min(max(system_filesystem_usage_bytes{system_filesystem_state="used",mount="/"}) + max(system_filesystem_usage_bytes{system_filesystem_state="free",mount="/"}), 1)
-              instant: false
-              range: true
-              intervalMs: 30000
-              maxDataPoints: 43200
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              refId: B
-              type: reduce
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              refId: C
-              type: threshold
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - type: query
-                  evaluator: { type: gt, params: [0.85] }
-
-      - uid: dartastic_starter_cpu
-        title: Box CPU is saturated
-        condition: C
-        for: 10m
-        labels:
-          severity: warning
-          dartastic_starter: "true"
-        annotations:
-          summary: The box has been over 90% CPU for 10 minutes
-          description: >-
-            Sustained high CPU can drop spans and slow queries. Check the
-            Server Health dashboard; consider a larger box.
-        noDataState: OK
-        execErrState: OK
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              refId: A
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              expr: 1 - avg(system_cpu_utilization{state="idle"})
-              instant: false
-              range: true
-              intervalMs: 30000
-              maxDataPoints: 43200
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              refId: B
-              type: reduce
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              refId: C
-              type: threshold
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - type: query
-                  evaluator: { type: gt, params: [0.9] }
-
-      - uid: dartastic_starter_memory
-        title: Box memory is under pressure
-        condition: C
-        for: 10m
-        labels:
-          severity: warning
-          dartastic_starter: "true"
-        annotations:
-          summary: The box has been over 90% memory for 10 minutes
-          description: >-
-            Low free memory risks OOM-kills of the telemetry stack. Check the
-            Server Health dashboard; consider a larger box.
-        noDataState: OK
-        execErrState: OK
-        data:
-          - refId: A
-            relativeTimeRange: { from: 600, to: 0 }
-            datasourceUid: prometheus
-            model:
-              refId: A
-              datasource: { type: prometheus, uid: prometheus }
-              editorMode: code
-              expr: avg(system_memory_utilization{state="used"})
-              instant: false
-              range: true
-              intervalMs: 30000
-              maxDataPoints: 43200
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              refId: B
-              type: reduce
-              expression: A
-              reducer: last
-              datasource: { type: __expr__, uid: __expr__ }
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              refId: C
-              type: threshold
-              expression: B
-              datasource: { type: __expr__, uid: __expr__ }
-              conditions:
-                - type: query
-                  evaluator: { type: gt, params: [0.9] }

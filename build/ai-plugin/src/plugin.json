@@ -4,28 +4,41 @@
   "name": "Dartastic AI",
   "id": "dartastic-ai-panel",
   "info": {
-    "description": "Chat with the Dartastic AI gateway from inside Grafana. Calls localhost:8091 over the container's loopback via Grafana's plugin proxy — no network exit, no HMAC handshake. Refuses to render any answer without grounded citations.",
+    "description": "Chat with the Dartastic AI gateway from inside Grafana, admins only. Grafana's plugin proxy forwards to the gateway on the container's loopback (127.0.0.1:8091) and refuses non-admins before proxying. Refuses to render any answer without grounded citations.",
     "author": {
       "name": "Mindful Software LLC (Dartastic.io)",
       "url": "https://dartastic.io"
     },
-    "keywords": ["dartastic", "ai", "telemetry", "ot", "chat"],
+    "keywords": [
+      "dartastic",
+      "ai",
+      "telemetry",
+      "ot",
+      "chat"
+    ],
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
     },
     "links": [
-      { "name": "Dartastic AI", "url": "https://dartastic.io/ai" },
-      { "name": "Source", "url": "https://github.com/Dartastic/hosted/tree/main/grafana-plugins/dartastic-ai-panel" }
+      {
+        "name": "Dartastic AI",
+        "url": "https://dartastic.io/ai"
+      },
+      {
+        "name": "Source",
+        "url": "https://github.com/Dartastic/hosted/tree/main/grafana-plugins/dartastic-ai-panel"
+      }
     ],
     "screenshots": [],
-    "version": "0.1.0",
-    "updated": "2026-05-20"
+    "version": "0.2.0",
+    "updated": "2026-09-25"
   },
   "includes": [
     {
       "type": "panel",
-      "name": "Dartastic AI"
+      "name": "Dartastic AI",
+      "role": "Admin"
     }
   ],
   "dependencies": {
@@ -34,9 +47,10 @@
   },
   "routes": [
     {
-      "path": "ai",
+      "path": "ai/api/v1/query",
       "method": "POST",
-      "url": "http://127.0.0.1:8091",
+      "reqRole": "Admin",
+      "url": "http://127.0.0.1:8091/api/v1/query",
       "headers": [
         {
           "name": "X-Forwarded-By",
