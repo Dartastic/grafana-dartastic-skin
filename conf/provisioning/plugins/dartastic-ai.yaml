@@ -1,0 +1,14 @@
+# Dartastic AI app plugin settings on Hosted: the gateway runs in this
+# container on loopback, and the bearer token is the one
+# dartastic-entrypoint.sh mints at every start ($AI_GATEWAY_TOKEN). The
+# plugin route reads both (jsonData.gatewayUrl, secureJsonData.gatewayToken);
+# Self-Hosted sets its own values (byoc doc/AI_GATEWAY_SELF_HOSTED.md).
+apiVersion: 1
+apps:
+  - type: dartastic-ai-panel
+    org_id: 1
+    disabled: false
+    jsonData:
+      gatewayUrl: http://127.0.0.1:8091
+    secureJsonData:
+      gatewayToken: $AI_GATEWAY_TOKEN

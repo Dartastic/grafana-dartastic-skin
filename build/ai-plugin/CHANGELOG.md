@@ -35,6 +35,18 @@ All notable changes to this plugin live here.  Follows
   range — the user has to paste the trace_id explicitly.  Smarter
   "use the active trace from this panel" plumbing is P2.
 
+## [0.3.0] - 2026-09-26
+
+### Changed
+- The proxy route reads the gateway address from `jsonData.gatewayUrl`
+  and sends `secureJsonData.gatewayToken` as a bearer token, so the same
+  plugin serves Hosted (gateway in the Grafana container) and
+  Self-Hosted (gateway as its own service). The token never reaches the
+  browser.
+
+### Added
+- Published as an OCI image for Self-Hosted Grafana installs.
+
 ## [0.2.0] - 2026-09-25
 
 ### Fixed

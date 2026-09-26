@@ -20,8 +20,8 @@ import {
 /// The single panel the plugin exposes.  Renders a chat surface
 /// the customer's developer / on-call uses to ask questions about
 /// their own telemetry.  Every fetch goes through Grafana's
-/// plugin proxy (defined in plugin.json `routes:`) so the gateway
-/// sees a 127.0.0.1 caller and grants under localhost-trust mode.
+/// plugin proxy (plugin.json `routes:`), which refuses non-admins and
+/// adds the gateway token and the caller's signed ID token.
 export const DartasticAiPanel: React.FC<PanelProps<DartasticAiPanelOptions>> = ({
   options,
   width,

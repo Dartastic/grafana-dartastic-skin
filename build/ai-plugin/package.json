@@ -1,6 +1,6 @@
 {
   "name": "dartastic-ai-panel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Grafana app plugin — chat panel that calls the bundled Dartastic AI gateway over Grafana's plugin proxy.",
   "license": "LicenseRef-Dartastic-Commercial",
   "private": true,
