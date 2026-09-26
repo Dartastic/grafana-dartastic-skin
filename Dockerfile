@@ -370,6 +370,21 @@ COPY build/skin-en-US.json      ${GF_PUBLIC}/locales/en-US/grafana.json
 # Grafana" tutorial card on the home dashboard), and the upstream
 # help menu (mostly grafana.com doc links).
 COPY conf/custom.ini            /otel-lgtm/grafana/conf/custom.ini
+# Hosted-only AI lines. conf/custom.ini is shared with the Cloud image, which
+# never has AI, so they are added here instead:
+#   - allow the AI plugin (the app and its nested panel, which Grafana checks
+#     on its own id) to load unsigned; nothing else is allowed unsigned;
+#   - idForwarding: the AI gateway takes the org and role only from
+#     Grafana's signed ID token (X-Grafana-Id), which the plugin proxy
+#     forwards only with this toggle (on by default in 13.0.1; set so a
+#     default change cannot remove it).
+RUN ini=/otel-lgtm/grafana/conf/custom.ini; \
+    sed -i 's/^\[plugins\]$/[plugins]\nallow_loading_unsigned_plugins = dartastic-ai-panel,dartastic-ai-panel-panel/' "$ini"; \
+    sed -i 's/^\[feature_toggles\]$/[feature_toggles]\nidForwarding = true/' "$ini"; \
+    grep -qx 'allow_loading_unsigned_plugins = dartastic-ai-panel,dartastic-ai-panel-panel' "$ini" \
+      || { echo "ERROR: no [plugins] section in custom.ini to carry the AI plugin allowance" >&2; exit 1; }; \
+    grep -qx 'idForwarding = true' "$ini" \
+      || { echo "ERROR: no [feature_toggles] section in custom.ini to carry idForwarding" >&2; exit 1; }
 
 # --- Dartastic dashboards (#101) ---
 # Auto-provision the customer-facing dashboards on first boot so a
