@@ -10,7 +10,7 @@
 #     in OpenMetrics text format (see hosted/ai-gateway/lib/src/
 #     metrics.dart).
 #
-# When AI is off on this box (no ANTHROPIC_API_KEY → entrypoint
+# When AI is off on this box (no AI_PROVIDER_KEY → entrypoint
 # doesn't start the gateway), the scrape silently fails with up=0
 # and the Mimir series quietly stop updating — no error, no log
 # spam.  When AI flips on, the panel lights up within one scrape
@@ -37,14 +37,17 @@ receivers:
           scrape_interval: 1s
           static_configs:
             - targets: ["127.0.0.1:8888"]
-  # Dartastic-added: scrape the bundled AI gateway's /metrics.
-  # Same loopback origin the gateway's localhost-only handler trusts.
+  # Dartastic-added: scrape the bundled AI gateway's /metrics, with the
+  # gateway bearer token dartastic-entrypoint.sh mints at every start.
   prometheus/ai-gateway:
     config:
       scrape_configs:
         - job_name: "dartastic-ai-gateway"
           scrape_interval: 15s
           metrics_path: "/metrics"
+          authorization:
+            type: Bearer
+            credentials_file: /run/ai-gateway/token
           static_configs:
             - targets: ["127.0.0.1:8091"]
 

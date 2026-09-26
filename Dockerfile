@@ -19,8 +19,7 @@ ARG UPSTREAM_TAG=latest
 # `build/ai-gateway/` by build-and-push.sh — same pattern as the
 # dashboards staging.  The gateway binary ships in this image but
 # is OFF BY DEFAULT — dartastic-entrypoint.sh only starts it when
-# ANTHROPIC_API_KEY + at least one AI_GATEWAY_CUSTOMER_<ID>_SECRET
-# are present at boot.
+# the box's ai-gateway.env carries AI_PROVIDER_KEY.
 #
 # License posture: the Dart binary is Pro Commercial (see
 # ../ai-gateway/LICENSE).  Bundling a separately-licensed program
@@ -397,6 +396,9 @@ COPY conf/dartastic-reference-demo-dashboards.yaml  /otel-lgtm/grafana/conf/prov
 # RULES actually deliver instead of "failed to send". Address is injected per
 # box as $ADMIN_ALERT_EMAIL; SMTP transport via GF_SMTP_* (docker-compose.lgtm).
 COPY conf/provisioning/alerting/dartastic-default.yaml  /otel-lgtm/grafana/conf/provisioning/alerting/dartastic-default.yaml
+# The AI app plugin's gateway address and bearer token (token minted by
+# dartastic-entrypoint.sh at every start and passed as $AI_GATEWAY_TOKEN).
+COPY conf/provisioning/plugins/dartastic-ai.yaml  /otel-lgtm/grafana/conf/provisioning/plugins/dartastic-ai.yaml
 
 # --- Starter alert rules (hosted#184) ---
 # A small pack of file-provisioned rules (app error rate, crashes, no-telemetry,
@@ -441,9 +443,7 @@ RUN set -eux; \
 
 # --- Bundle the Dartastic AI gateway binary (#85 P1) ---
 # Off-by-default: the wrapper entrypoint only starts the gateway
-# when ANTHROPIC_API_KEY + at least one AI_GATEWAY_CUSTOMER_<ID>_SECRET
-# are present on the box at boot.  Customers without an AI add-on
-# never see it run.
+# when the box's ai-gateway.env carries AI_PROVIDER_KEY.
 COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 
 # --- OTel collector config override (#85 P1.G) ---
@@ -480,16 +480,12 @@ RUN grep -qx 'export GF_PATHS_PLUGINS=/data/grafana/plugins' /otel-lgtm/run-graf
 COPY scripts/dartastic-entrypoint.sh /usr/local/bin/dartastic-entrypoint.sh
 RUN chmod +x /usr/local/bin/dartastic-entrypoint.sh
 
-# Persistent-disk path for the gateway's state (rate-limiter
-# buckets, future cached embeddings).  Compose mounts a named
-# volume here so a container restart doesn't wipe per-customer
-# usage history — addresses the "but I want to update AI on a
-# different cadence than LGTM" concern by making state durable
-# across image bumps.
-RUN mkdir -p /var/lib/dartastic-ai && chmod 755 /var/lib/dartastic-ai
-VOLUME ["/var/lib/dartastic-ai"]
+# The AI gateway's state (the daily spend, per UTC day) at the fixed path
+# the Self-Hosted contract names; compose mounts a named volume here so a
+# restart cannot reset the budget cap.
+RUN mkdir -p /var/lib/ai-gateway && chmod 700 /var/lib/ai-gateway
+VOLUME ["/var/lib/ai-gateway"]
 
-EXPOSE 8091
 ENTRYPOINT ["/usr/local/bin/dartastic-entrypoint.sh"]
 
 # Labels for image provenance + AGPL source offer.
