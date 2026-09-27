@@ -65,6 +65,7 @@ if [[ -z "$BASE_URL" ]]; then
     -e GF_AUTH_ANONYMOUS_ENABLED=false \
     -e GF_FEATURE_TOGGLES_ENABLE=alertingTriage \
     -e ADMIN_ALERT_EMAIL=brand-scan@example.invalid \
+    -e DARTASTIC_SOURCE_URL=https://github.com/Dartastic/grafana-dartastic-skin \
     "$IMAGE" >/dev/null
   BOOTED=1
   BASE_URL="http://127.0.0.1:${PORT}"

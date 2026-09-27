@@ -446,7 +446,7 @@ RUN set -eux; \
     # 3. Inject our JS text-rewriter just before </body>. Runs after
     # the React bundle so the MutationObserver catches everything
     # the SPA renders. `defer` keeps it from blocking initial paint.
-    sed -i 's|</body>|<script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
+    sed -i 's|</body>|<script src="public/js/dartastic-source.js" defer></script>\n  <script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
     # 4. Loading-spinner aria-label (screen-reader text) — accessibility
     # courtesy. Not visible in the UI but worth aligning.
     sed -i 's|aria-label="Loading Grafana"|aria-label="Loading dashboards"|' "$INDEX"; \
@@ -477,6 +477,18 @@ COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 # /otel-lgtm/otelcol-config.yaml`.
 COPY conf/otelcol-config.yaml   /otel-lgtm/otelcol-config.yaml
 
+# Pyroscope must not profile itself into the customer's store. Upstream
+# leaves self-profiling push on, so Pyroscope's own profiles land under the
+# service name "pyroscope", and the Profiles page shows a "pyroscope" panel:
+# an upstream mark in the customer's UI whenever that data has arrived (the
+# brand scan's recurring /a/grafana-pyroscope-app failure). The build fails
+# if the setting cannot be added.
+RUN cfg=/otel-lgtm/pyroscope-config.yaml; \
+    ! grep -q '^self_profiling:' "$cfg" \
+      || { echo "FATAL: upstream $cfg already has self_profiling; merge by hand" >&2; exit 1; }; \
+    printf '\nself_profiling:\n  disable_push: true\n' >> "$cfg"; \
+    grep -q '^  disable_push: true$' "$cfg"
+
 # --- Bundle the Dartastic AI Grafana plugin (#85 P1.D) ---
 # Staged at /var/lib/grafana/plugins/, which this Grafana does NOT
 # read: upstream's run-grafana.sh points GF_PATHS_PLUGINS at
@@ -497,7 +509,8 @@ RUN grep -qx 'export GF_PATHS_PLUGINS=/data/grafana/plugins' /otel-lgtm/run-graf
 # then execs the original LGTM entrypoint in the foreground (so if
 # LGTM dies the container restarts and supervisor semantics work).
 COPY scripts/dartastic-entrypoint.sh /usr/local/bin/dartastic-entrypoint.sh
-RUN chmod +x /usr/local/bin/dartastic-entrypoint.sh
+COPY scripts/write-source-url.sh      /usr/local/bin/write-source-url.sh
+RUN chmod +x /usr/local/bin/dartastic-entrypoint.sh /usr/local/bin/write-source-url.sh
 
 # The AI gateway's state (the daily spend, per UTC day) at the fixed path
 # the Self-Hosted contract names; compose mounts a named volume here so a
@@ -514,6 +527,6 @@ ENTRYPOINT ["/usr/local/bin/dartastic-entrypoint.sh"]
 
 # Labels for image provenance + AGPL source offer.
 LABEL org.opencontainers.image.title="Dartastic Hosted — skinned LGTM + AI"
-LABEL org.opencontainers.image.source="https://github.com/dartastic/grafana-dartastic-skin"
+LABEL org.opencontainers.image.source="https://github.com/Dartastic/grafana-dartastic-skin"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only AND LicenseRef-Dartastic-Commercial"
 LABEL io.dartastic.upstream="grafana/otel-lgtm:${UPSTREAM_TAG}"

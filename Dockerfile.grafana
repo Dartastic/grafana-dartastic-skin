@@ -108,6 +108,13 @@ RUN set -eux; \
 # --- CSS overlay + JS runtime text-replacer (same files) ---
 COPY css/dartastic-skin.css     ${GF_PUBLIC}/css/dartastic-skin.css
 COPY js/dartastic-skin.js       ${GF_PUBLIC}/js/dartastic-skin.js
+# The footer's source link (DARTASTIC_SOURCE_URL) is written at start by
+# grafana-entrypoint.sh into /tmp, writable under a read-only root; Grafana
+# serves it through this symlink.
+COPY scripts/write-source-url.sh   /usr/local/bin/write-source-url.sh
+COPY scripts/grafana-entrypoint.sh /usr/local/bin/grafana-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/write-source-url.sh /usr/local/bin/grafana-entrypoint.sh \
+ && ln -s /tmp/dartastic/source.js ${GF_PUBLIC}/js/dartastic-source.js
 
 # Stamp the product name into the skin (source files say "Dartastic Hosted";
 # a cloud build rewrites to its PRODUCT_NAME). Plain-string sed: the name
@@ -191,7 +198,7 @@ RUN set -eux; \
     INDEX=${GF_PUBLIC}/views/index.html; \
     sed -i 's|<title>\[\[\.AppTitle\]\]</title>|<title>Dartastic</title>|' "$INDEX"; \
     sed -i 's|\[\[range \$asset := \.Assets\.CSSFiles\]\]|<link rel="stylesheet" href="public/css/dartastic-skin.css" />\n    [[range $asset := .Assets.CSSFiles]]|' "$INDEX"; \
-    sed -i 's|</body>|<script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
+    sed -i 's|</body>|<script src="public/js/dartastic-source.js" defer></script>\n  <script src="public/js/dartastic-skin.js" defer></script>\n  </body>|' "$INDEX"; \
     sed -i 's|aria-label="Loading Grafana"|aria-label="Loading dashboards"|' "$INDEX"; \
     sed -i 's|<h1>If you'\''re seeing this Grafana has failed to load|<h1>If you'\''re seeing this Dartastic has failed to load|' "$INDEX"; \
     grep -q "<title>Dartastic</title>" "$INDEX" \
@@ -206,11 +213,13 @@ RUN set -eux; \
 RUN grep -qa splashScreen /usr/share/grafana/bin/grafana \
       || (echo "ERROR: 'splashScreen' feature toggle missing from the Grafana binary — the What's-new kill in conf/custom.ini no longer works. Find the new gate before shipping." >&2 && exit 1)
 
-# Back to the upstream image's unprivileged user + stock entrypoint.
+# Back to the upstream image's unprivileged user. The entrypoint writes the
+# source link, then execs the stock /run.sh.
 USER grafana
+ENTRYPOINT ["/usr/local/bin/grafana-entrypoint.sh"]
 
 LABEL org.opencontainers.image.title="Dartastic — skinned Grafana (discrete stack)"
-LABEL org.opencontainers.image.source="https://github.com/dartastic/grafana-dartastic-skin"
+LABEL org.opencontainers.image.source="https://github.com/Dartastic/grafana-dartastic-skin"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 # Grafana's own LICENSE (AGPL-3.0) ships in the image, unmodified. Never
 # delete it; the build fails if it is missing.

@@ -23,7 +23,9 @@ echo "==> Starting ${IMAGE} on :${PORT}"
 # ADMIN_ALERT_EMAIL: the default contact point interpolates it, and
 # Grafana refuses to start without an address. Boxes set it from Doppler.
 docker run --rm -d --name "$CONTAINER" -p "${PORT}:3000" \
-  -e ADMIN_ALERT_EMAIL=smoke-test@example.invalid "$IMAGE" >/dev/null
+  -e ADMIN_ALERT_EMAIL=smoke-test@example.invalid \
+  -e DARTASTIC_SOURCE_URL=https://github.com/Dartastic/grafana-dartastic-skin \
+  "$IMAGE" >/dev/null
 
 echo -n "==> Waiting for Grafana to come up"
 # Grafana downloads its preinstalled plugins before it listens, so allow
@@ -176,5 +178,18 @@ for plugin_id in dartastic-ai-panel dartastic-ai-panel-panel; do
   [[ "$code" == "200" ]] || fail "plugin ${plugin_id} not registered (module.js HTTP ${code})"
   pass "plugin ${plugin_id} registered"
 done
+
+# 10. The footer's source link is the configured DARTASTIC_SOURCE_URL, and
+# the image refuses to start without one.
+SRC="$(curl -fsS "http://127.0.0.1:${PORT}/public/js/dartastic-source.js")"
+[[ "$SRC" == 'window.DARTASTIC_SOURCE_URL = "https://github.com/Dartastic/grafana-dartastic-skin";' ]] \
+  || fail "dartastic-source.js is not the configured source URL: $SRC"
+pass "footer source URL served from DARTASTIC_SOURCE_URL"
+set +e
+docker run --rm "$IMAGE" >/dev/null 2>&1
+NO_URL_EXIT=$?
+set -e
+[[ "$NO_URL_EXIT" == "64" ]] || fail "image started without DARTASTIC_SOURCE_URL (exit $NO_URL_EXIT, want 64)"
+pass "image refuses to start without DARTASTIC_SOURCE_URL"
 
 echo "==> All assertions passed"

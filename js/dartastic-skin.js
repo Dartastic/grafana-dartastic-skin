@@ -309,16 +309,40 @@
   const AGPL_COLLAPSE_AFTER_MS = 10000;
   const AGPL_REEXPAND_LINGER_MS = 600; // grace before re-collapsing on mouseleave
 
+  // Where the Corresponding Source is, per deployment: DARTASTIC_SOURCE_URL,
+  // written at container start into public/js/dartastic-source.js (loaded
+  // before this script). Hosted and Cloud point at the public mirror; an
+  // air-gapped Self-Hosted install points at its own copy. The container
+  // refuses to start without it, so a missing value here is a broken image.
+  function sourceUrl() {
+    const u = window.DARTASTIC_SOURCE_URL;
+    if (typeof u !== 'string' || !/^https?:\/\//.test(u)) {
+      console.error('[dartastic] DARTASTIC_SOURCE_URL missing: dartastic-source.js not loaded');
+      return null;
+    }
+    return u;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
   function buildAgplFooter() {
     if (document.getElementById('dartastic-agpl-footer')) return;
     const bar = document.createElement('div');
     bar.id = 'dartastic-agpl-footer';
     bar.setAttribute('role', 'contentinfo');
+    const url = sourceUrl();
+    const source = url
+      ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
+        escapeHtml(url.replace(/^https?:\/\//, '')) + '</a>'
+      : 'source location not configured';
     bar.innerHTML =
       '<span class="daf-full">This service runs modified Grafana, licensed under AGPL-3.0 ' +
-      'with no warranty. Source: ' +
-      '<a href="https://github.com/dartastic/grafana-dartastic-skin" target="_blank" rel="noopener noreferrer">' +
-      'github.com/dartastic/grafana-dartastic-skin</a> · Grafana® is a trademark of Grafana Labs. ' +
+      'with no warranty. Source: ' + source +
+      ' · Grafana® is a trademark of Grafana Labs. ' +
       'Dartastic.io is not affiliated with, endorsed, or sponsored by Grafana Labs.</span>' +
       '<span class="daf-short" role="button" tabindex="0" aria-label="Show open-source and trademark notice">ⓘ open source</span>';
 

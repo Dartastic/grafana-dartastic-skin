@@ -22,6 +22,10 @@ set -eu
 LOG_DIR=/var/log/dartastic
 mkdir -p "$LOG_DIR"
 
+# The AGPL §13 source location the footer links to (DARTASTIC_SOURCE_URL,
+# required): the container stops here without it.
+/usr/local/bin/write-source-url.sh /otel-lgtm/grafana/public/js/dartastic-source.js
+
 # ── AI gateway credentials: files, never environment ─────────────────
 # The gateway reads its bearer token and the provider key from files it
 # re-reads on every use. The token is minted here at every start: only

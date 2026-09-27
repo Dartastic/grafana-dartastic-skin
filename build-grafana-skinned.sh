@@ -66,6 +66,7 @@ echo "==> Building ${FULL} (upstream=grafana/grafana:${UPSTREAM_TAG})"
 for f in img/grafana_icon.svg img/grafana_typelogo.svg img/fav32.png \
          img/apple-touch-icon.png img/g8_login_dark.svg img/g8_login_light.svg \
          css/dartastic-skin.css js/dartastic-skin.js conf/custom.ini \
+         scripts/write-source-url.sh scripts/grafana-entrypoint.sh \
          build/rewrite-locale.py Dockerfile.grafana; do
   [[ -f "$SCRIPT_DIR/$f" ]] || { echo "ERROR: missing $f" >&2; exit 1; }
 done
