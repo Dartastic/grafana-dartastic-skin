@@ -59,7 +59,8 @@ const anyMark = (s) => MARK.test(s) || LABS_MARKS.test(s);
 // only after asserting its text is EXACTLY this — so the exclusion can never
 // mask an unrelated leak that crawled into the footer element.
 const AGPL_FOOTER_SENTENCE =
-  'This service runs modified Grafana — source: ' +
+  'This service runs modified Grafana, licensed under AGPL-3.0 with no ' +
+  'warranty. Source: ' +
   'github.com/dartastic/grafana-dartastic-skin · Grafana® is a trademark of ' +
   'Grafana Labs. Dartastic.io is not affiliated with, endorsed, or sponsored ' +
   'by Grafana Labs.';

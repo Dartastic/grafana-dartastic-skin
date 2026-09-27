@@ -143,17 +143,20 @@ RUN set -eux; \
     sed -i \
       -e 's@<img[^>]*logo_new_transparent[^>]*>@@' \
       -e 's@📁@<img src="{{ $.AppUrl }}public/img/apple-touch-icon.png" width="22" height="22" style="border:0;vertical-align:middle;">@g' \
-      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
+      -e 's@&copy; {{ now | date "2006" }} Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic</a>.@' \
       -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/alerts"@g' \
       -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
       -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
       ng_alert_notification.html; \
     sed -i \
-      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic.io@' \
+      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic.@' \
       -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
       -e 's@for {{ .GroupLabels }}@for {{ index .GroupLabels "alertname" }}@' \
       ng_alert_notification.txt; \
-    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
+    # No copyright line of ours either: the template is Grafana's
+    # (AGPL), modified, and claiming "(c) Dartastic.io" on it would claim
+    # their work (byoc licensing review).
+    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent|&copy;|\(c\)' \
          ng_alert_notification.html ng_alert_notification.txt; then \
       echo "FATAL: alert-email de-brand missed a leak — upstream template reworded?" >&2; \
       exit 1; \
@@ -209,4 +212,9 @@ USER grafana
 LABEL org.opencontainers.image.title="Dartastic — skinned Grafana (discrete stack)"
 LABEL org.opencontainers.image.source="https://github.com/dartastic/grafana-dartastic-skin"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+# Grafana's own LICENSE (AGPL-3.0) ships in the image, unmodified. Never
+# delete it; the build fails if it is missing.
+RUN test -s /usr/share/grafana/LICENSE \
+ || { echo "FATAL: /usr/share/grafana/LICENSE is missing; Grafana's license must ship" >&2; exit 1; }
+
 LABEL io.dartastic.upstream="grafana/grafana:${UPSTREAM_TAG}"

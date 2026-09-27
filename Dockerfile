@@ -292,7 +292,8 @@ COPY dashboards/home.json       ${GF_PUBLIC}/dashboards/home.json
 # above the logo img; the other three 20px paddings are real section spacing),
 # and the Dartastic heart (public/img/apple-touch-icon.png, PNG so Gmail/
 # Outlook render it) replaces the folder emoji INSIDE the <h2> title line at
-# 22px. Footer copyright names the DBA "Dartastic.io". "View alert" buttons
+# 22px. The footer says "Sent by Dartastic." with no copyright line: the
+# template is Grafana's, modified, not ours. "View alert" buttons
 # go to /alerting/alerts (the ACTIVE-instances route Grafana 13 actually
 # registers — /alerting/groups renders via a legacy fallback with 404 page
 # chrome; /alerting/list is rule CONFIG, wrong audience. The route is gated
@@ -310,17 +311,20 @@ RUN set -eux; \
     sed -i \
       -e 's@<img[^>]*logo_new_transparent[^>]*>@@' \
       -e 's@📁@<img src="{{ $.AppUrl }}public/img/apple-touch-icon.png" width="22" height="22" style="border:0;vertical-align:middle;">@g' \
-      -e 's@Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@<a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic.io</a>.@' \
+      -e 's@&copy; {{ now | date "2006" }} Grafana Labs. Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Grafana v{{ .BuildVersion }}</a>.@Sent by <a href="{{ .AppUrl }}" style="color: #6E9FFF;">Dartastic</a>.@' \
       -e 's@href="{{ .GeneratorURL }}"@href="{{ $.AppUrl }}alerting/alerts"@g' \
       -e 's@href="{{ .SilenceURL }}"@href="{{ $.AppUrl }}alerting/silences"@g' \
       -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
       ng_alert_notification.html; \
     sed -i \
-      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic (c) {{now | date "2006"}} Dartastic.io@' \
+      -e 's@Sent by Grafana v{{.BuildVersion}} (c) {{now | date "2006"}} Grafana Labs@Sent by Dartastic.@' \
       -e 's@{{ .Name }}@{{ if eq .Name "grafana_folder" }}folder{{ else }}{{ .Name }}{{ end }}@g' \
       -e 's@for {{ .GroupLabels }}@for {{ index .GroupLabels "alertname" }}@' \
       ng_alert_notification.txt; \
-    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent' \
+    # No copyright line of ours either: the template is Grafana's
+    # (AGPL), modified, and claiming "(c) Dartastic.io" on it would claim
+    # their work (byoc licensing review).
+    if grep -Eiq 'grafana labs|grafana v|logo_new_transparent|&copy;|\(c\)' \
          ng_alert_notification.html ng_alert_notification.txt; then \
       echo "FATAL: alert-email de-brand missed a leak — upstream template reworded?" >&2; \
       exit 1; \
@@ -500,6 +504,11 @@ RUN chmod +x /usr/local/bin/dartastic-entrypoint.sh
 # restart cannot reset the budget cap.
 RUN mkdir -p /var/lib/ai-gateway && chmod 700 /var/lib/ai-gateway
 VOLUME ["/var/lib/ai-gateway"]
+
+# Grafana's own LICENSE (AGPL-3.0) ships in the image, unmodified. Never
+# delete it; the build fails if it is missing.
+RUN test -s /otel-lgtm/grafana/LICENSE \
+ || { echo "FATAL: /otel-lgtm/grafana/LICENSE is missing; Grafana's license must ship" >&2; exit 1; }
 
 ENTRYPOINT ["/usr/local/bin/dartastic-entrypoint.sh"]
 

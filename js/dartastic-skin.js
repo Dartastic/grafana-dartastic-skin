@@ -315,7 +315,8 @@
     bar.id = 'dartastic-agpl-footer';
     bar.setAttribute('role', 'contentinfo');
     bar.innerHTML =
-      '<span class="daf-full">This service runs modified Grafana — source: ' +
+      '<span class="daf-full">This service runs modified Grafana, licensed under AGPL-3.0 ' +
+      'with no warranty. Source: ' +
       '<a href="https://github.com/dartastic/grafana-dartastic-skin" target="_blank" rel="noopener noreferrer">' +
       'github.com/dartastic/grafana-dartastic-skin</a> · Grafana® is a trademark of Grafana Labs. ' +
       'Dartastic.io is not affiliated with, endorsed, or sponsored by Grafana Labs.</span>' +
