@@ -43,11 +43,18 @@ if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
   printf '%s' "$AI_PROVIDER_KEY" > "$AI_RUN_DIR/provider-key"
   unset AI_PROVIDER_KEY
   echo "[dartastic-entrypoint] starting ai_gateway (logs: $LOG_DIR/ai_gateway.log)"
-  # Loopback only: Grafana's plugin proxy, in this container, is the one
-  # caller. Grafana's signing keys are read from the same loopback, and
-  # /v1/ask's tools read this container's Tempo, Loki and Prometheus
-  # (single-tenant here: they ignore X-Scope-OrgID).
-  env AI_GATEWAY_LISTEN=127.0.0.1:8091 \
+  # Two callers: Grafana's plugin proxy in this container (the panel), and
+  # the dartastic.io Control Room's POST /v1/ask, which reaches the box's
+  # nginx at https://<box>/ai/v1/ask and is proxied to the host's
+  # 127.0.0.1:8091, published from here (docker-compose.dartastic.yml). So
+  # the gateway listens on the container's interfaces; the host publishes it
+  # on loopback only, and nginx forwards exactly /ai/v1/ask. /v1/ask needs a
+  # DAIQ token; every other route needs the gateway token.
+  # Grafana's signing keys are read on this container's loopback, and
+  # /v1/ask's tools read its Tempo, Loki and Prometheus (single-tenant: they
+  # ignore X-Scope-OrgID). The gateway's own telemetry goes to this box's
+  # collector as service ai-gateway, which the tools leave out.
+  env AI_GATEWAY_LISTEN=0.0.0.0:8091 \
       AI_GATEWAY_TOKEN_FILE="$AI_RUN_DIR/token" \
       AI_KEY_SOURCE=file \
       AI_PROVIDER_KEY_FILE="$AI_RUN_DIR/provider-key" \
@@ -56,6 +63,8 @@ if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
       AI_STORE_TEMPO_URL=http://127.0.0.1:3200 \
       AI_STORE_LOKI_URL=http://127.0.0.1:3100 \
       AI_STORE_PROMETHEUS_URL=http://127.0.0.1:9090 \
+      OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
+      OTEL_SERVICE_NAME=ai-gateway \
       /usr/local/bin/ai_gateway >>"$LOG_DIR/ai_gateway.log" 2>&1 &
   # A refused configuration exits 64 with one line naming the variable;
   # it lands in ai_gateway.log and Grafana keeps serving.
