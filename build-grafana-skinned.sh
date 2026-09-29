@@ -61,6 +61,34 @@ ghcr_assert_tag_free "$NS" "$IMAGE" "$TAG" "$GHCR_TAGS"
 FULL="${REGISTRY}/${IMAGE}:${TAG}"
 LATEST="${REGISTRY}/${IMAGE}:latest"
 
+# PLAN_ONLY=1: name the tag this build will get, and stop. CI mirrors and tags
+# the AGPL §13 source at that name BEFORE building (mirror-and-tag.sh), then
+# builds with SKIN_REV fixed to it.
+if [[ "${PLAN_ONLY:-0}" == "1" ]]; then
+  echo "tag=${TAG}"
+  echo "rev=${SKIN_REV}"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    { echo "tag=${TAG}"; echo "rev=${SKIN_REV}"; } >> "$GITHUB_OUTPUT"
+  fi
+  exit 0
+fi
+
+# The published image names the exact mirror commit it was built from
+# (org.opencontainers.image.revision): the AGPL §13 corresponding source, and
+# what a Self-Hosted bundle pins. A pushed image without it is refused by the
+# bundle build, so it is not pushed at all.
+REVISION_LABEL=()
+if [[ -n "${MIRROR_REVISION:-}" ]]; then
+  [[ "$MIRROR_REVISION" =~ ^[0-9a-f]{40}$ ]] \
+    || { echo "ERROR: MIRROR_REVISION must be a full commit sha" >&2; exit 1; }
+  REVISION_LABEL=(--label "org.opencontainers.image.revision=${MIRROR_REVISION}")
+elif [[ "${PUSH}" == "1" ]]; then
+  echo "ERROR: PUSH=1 needs MIRROR_REVISION, the mirror commit this build's source is" >&2
+  echo "       (mirror-and-tag.sh prints it). Refusing to publish an image whose source" >&2
+  echo "       cannot be pinned." >&2
+  exit 1
+fi
+
 echo "==> Building ${FULL} (upstream=grafana/grafana:${UPSTREAM_TAG})"
 
 for f in img/grafana_icon.svg img/grafana_typelogo.svg img/fav32.png \
@@ -91,6 +119,7 @@ if [[ "${PUSH}" == "1" ]]; then
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \
+    "${REVISION_LABEL[@]}" \
     --tag "${FULL}" --tag "${LATEST}" \
     --push .
 else
@@ -98,6 +127,7 @@ else
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \
+    ${REVISION_LABEL[@]+"${REVISION_LABEL[@]}"} \
     --tag "${FULL}" --tag "${LATEST}" \
     --load .
 fi
