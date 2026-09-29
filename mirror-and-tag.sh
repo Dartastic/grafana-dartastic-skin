@@ -35,11 +35,8 @@ until PUBLIC_REMOTE="$PUBLIC_REMOTE" PUBLIC_CLONE="$PUBLIC_CLONE" "$SCRIPT_DIR/m
   fi
   attempt=$((attempt + 1))
   echo "mirror-skin.sh failed; refetching the public repo and retrying ($attempt/3)" >&2
-  # mirror-skin.sh may have failed before cloning (a precondition).
-  if [[ -d "$PUBLIC_CLONE/.git" ]]; then
-    git -C "$PUBLIC_CLONE" fetch -q origin main
-    git -C "$PUBLIC_CLONE" reset -q --hard origin/main   # the throwaway CI clone only
-  fi
+  git -C "$PUBLIC_CLONE" fetch -q origin main
+  git -C "$PUBLIC_CLONE" reset -q --hard origin/main   # the throwaway CI clone only
   sleep 5
 done
 
