@@ -44,12 +44,18 @@ if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
   unset AI_PROVIDER_KEY
   echo "[dartastic-entrypoint] starting ai_gateway (logs: $LOG_DIR/ai_gateway.log)"
   # Loopback only: Grafana's plugin proxy, in this container, is the one
-  # caller. Grafana's signing keys are read from the same loopback.
+  # caller. Grafana's signing keys are read from the same loopback, and
+  # /v1/ask's tools read this container's Tempo, Loki and Prometheus
+  # (single-tenant here: they ignore X-Scope-OrgID).
   env AI_GATEWAY_LISTEN=127.0.0.1:8091 \
       AI_GATEWAY_TOKEN_FILE="$AI_RUN_DIR/token" \
       AI_KEY_SOURCE=file \
       AI_PROVIDER_KEY_FILE="$AI_RUN_DIR/provider-key" \
       AI_GATEWAY_GRAFANA_URL=http://127.0.0.1:3000 \
+      AI_STORE_DRIVER=lgtm \
+      AI_STORE_TEMPO_URL=http://127.0.0.1:3200 \
+      AI_STORE_LOKI_URL=http://127.0.0.1:3100 \
+      AI_STORE_PROMETHEUS_URL=http://127.0.0.1:9090 \
       /usr/local/bin/ai_gateway >>"$LOG_DIR/ai_gateway.log" 2>&1 &
   # A refused configuration exits 64 with one line naming the variable;
   # it lands in ai_gateway.log and Grafana keeps serving.
