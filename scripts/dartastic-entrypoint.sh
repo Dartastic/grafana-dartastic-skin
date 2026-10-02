@@ -42,6 +42,15 @@ export AI_GATEWAY_TOKEN
 if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
   printf '%s' "$AI_PROVIDER_KEY" > "$AI_RUN_DIR/provider-key"
   unset AI_PROVIDER_KEY
+  # Asks from inside the Observatory: the box-state sync secret, as a file
+  # the gateway re-reads on every pull. AI_BOX_STATE_URL, AI_BOX_ID and
+  # AI_BOX_STATE_ISSUER pass through from the env file; the gateway refuses
+  # to start on a partial set.
+  if [[ -n "${AI_BOX_STATE_SECRET:-}" ]]; then
+    printf '%s' "$AI_BOX_STATE_SECRET" > "$AI_RUN_DIR/box-state-secret"
+    unset AI_BOX_STATE_SECRET
+    export AI_BOX_STATE_SECRET_FILE="$AI_RUN_DIR/box-state-secret"
+  fi
   echo "[dartastic-entrypoint] starting ai_gateway (logs: $LOG_DIR/ai_gateway.log)"
   # Two callers: Grafana's plugin proxy in this container (the panel), and
   # the dartastic.io Control Room's POST /v1/ask, which reaches the box's

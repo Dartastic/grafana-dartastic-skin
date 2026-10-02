@@ -28,10 +28,13 @@ ARG UPSTREAM_TAG=latest
 # offer in the cluster UI still points at the public skin mirror,
 # which does NOT include the ai-gateway source (Pro repo, not OSS).
 FROM dart:stable AS ai-gateway-build
-WORKDIR /app
-COPY build/ai-gateway/pubspec.* /app/
+# /app/ai-gateway beside /app/packages, as in the repo: the gateway depends on
+# packages/dartastic_box_state by path.
+WORKDIR /app/ai-gateway
+COPY build/ai-gateway/pubspec.* /app/ai-gateway/
+COPY build/packages/ /app/packages/
 RUN dart pub get
-COPY build/ai-gateway/ /app/
+COPY build/ai-gateway/ /app/ai-gateway/
 RUN dart pub get --offline
 RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
 

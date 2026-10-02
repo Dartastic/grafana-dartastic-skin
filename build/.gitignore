@@ -18,3 +18,7 @@ ai-gateway/
 # build dirtied the tree re-staging it. Source of truth is
 # hosted/grafana-plugins/dartastic-ai-panel/.
 ai-plugin/
+# Staged box-state package (rsynced from ../packages/dartastic_box_state/),
+# which the staged gateway depends on by path. Commercial code: never in
+# the public skin mirror.
+packages/
