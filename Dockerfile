@@ -176,6 +176,36 @@ RUN set -eux; \
     grep -q '^        - name: traceID$' "$ds" || { echo "FATAL: traceID destination did not land" >&2; exit 1; }; \
     grep -q '^        - name: trace_id$' "$ds" || { echo "FATAL: trace_id destination was lost" >&2; exit 1; }
 
+# Data source DISPLAY names, product-neutral: Explore puts the data source's
+# name in the browser tab title, so upstream's "Loki", "Tempo",
+# "Prometheus" and "Pyroscope" showed in every evidence link a customer
+# opened. Only the names change: the uids (loki, tempo, prometheus,
+# pyroscope) stay, and every dashboard, cross-link and Control Room
+# citation refers to a data source by uid, never by name.
+RUN set -eux; \
+    ds=/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml; \
+    for pair in Prometheus:Metrics Tempo:Traces Loki:Logs Pyroscope:Profiles; do \
+      from="${pair%%:*}"; to="${pair##*:}"; \
+      grep -q "^  - name: $from\$" "$ds" || { echo "FATAL: no data source named $from — upstream changed?" >&2; exit 1; }; \
+      sed -i "s@^  - name: $from\$@  - name: $to@" "$ds"; \
+      grep -q "^  - name: $to\$" "$ds" || { echo "FATAL: data source $to did not land" >&2; exit 1; }; \
+    done; \
+    for uid in prometheus tempo loki pyroscope; do \
+      grep -q "^    uid: $uid\$" "$ds" || { echo "FATAL: data source uid $uid changed" >&2; exit 1; }; \
+    done; \
+    grep -q '^deleteDatasources:' "$ds" && { echo "FATAL: upstream now has deleteDatasources" >&2; exit 1; }; \
+    printf '%s\n' \
+      '# Boxes provisioned before the rename hold these names. Grafana finds a' \
+      '# provisioned data source BY NAME, so without deleting the old name first the' \
+      '# renamed one is inserted with an existing uid and provisioning fails. Grafana' \
+      '# deletes these before provisioning and, since each is recreated, keeps its' \
+      '# links; on a box that never had them the delete is skipped.' \
+      'deleteDatasources:' \
+      '  - {name: Prometheus, orgId: 1}' \
+      '  - {name: Tempo, orgId: 1}' \
+      '  - {name: Loki, orgId: 1}' \
+      '  - {name: Pyroscope, orgId: 1}' >> "$ds"
+
 # --- Image assets: logos, favicons, login backgrounds ---
 # Two locations get our overrides:
 #
