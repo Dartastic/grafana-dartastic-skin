@@ -7,9 +7,7 @@ modified Grafana over a network can get the corresponding source. The
 modified work is provided with no warranty (AGPL-3.0 sections 15 and 16).
 
 Statement of changes, as of 2026-09-27. Each image built from this source
-names the Grafana it is based on in its `io.dartastic.upstream` label, and
-upstream Grafana's source in `io.dartastic.upstream.source` (the repo) and
-`io.dartastic.upstream.revision` (the release tag, such as `v13.0.1`).
+names the Grafana it is based on in its `io.dartastic.upstream` label.
 
 ## What is modified
 
