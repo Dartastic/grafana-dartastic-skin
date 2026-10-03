@@ -227,3 +227,8 @@ RUN test -s /usr/share/grafana/LICENSE \
  || { echo "FATAL: /usr/share/grafana/LICENSE is missing; Grafana's license must ship" >&2; exit 1; }
 
 LABEL io.dartastic.upstream="grafana/grafana:${UPSTREAM_TAG}"
+# Upstream's own source, machine-readable: the repo and the release tag the
+# image was cut from (Grafana tags release X.Y.Z as vX.Y.Z). A Self-Hosted
+# bundle pins upstream Grafana's Corresponding Source by these two.
+LABEL io.dartastic.upstream.source="https://github.com/grafana/grafana"
+LABEL io.dartastic.upstream.revision="v${UPSTREAM_TAG}"
