@@ -176,7 +176,7 @@ rsync -a --exclude='.dart_tool' --exclude='pubspec.lock' --exclude='test' \
 echo "    $(find "$SCRIPT_DIR/build/ai-gateway" -name '*.dart' | wc -l | tr -d ' ') Dart files staged"
 # The packages the gateway depends on by path (../packages/…).
 rm -rf "$SCRIPT_DIR/build/packages"
-for pkg in dartastic_box_state dartastic_symbolizer_client; do
+for pkg in dartastic_box_state hosted_symbolizer_client; do
   mkdir -p "$SCRIPT_DIR/build/packages/$pkg"
   rsync -a --exclude='.dart_tool' --exclude='pubspec.lock' --exclude='test' \
     --exclude='.gitignore' \
