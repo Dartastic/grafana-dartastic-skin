@@ -15,7 +15,7 @@
 # The gateway runs the contract in byoc doc/AI_GATEWAY_SELF_HOSTED.md
 # (the same one as Self-Hosted), fed from /etc/dartastic/ai-gateway.env,
 # which hosted-deploy.sh rewrites from the box's Doppler config on every
-# deploy. AI is off unless that file carries AI_PROVIDER_KEY.
+# deploy. AI is off unless that file names AI_PROVIDER.
 
 set -eu
 
@@ -27,8 +27,10 @@ mkdir -p "$LOG_DIR"
 /usr/local/bin/write-source-url.sh /otel-lgtm/grafana/public/js/dartastic-source.js
 
 # ── AI gateway credentials: files, never environment ─────────────────
-# The gateway reads its bearer token and the provider key from files it
-# re-reads on every use. The token is minted here at every start: only
+# The gateway reads its bearer token from a file it re-reads on every use.
+# It has no model key at rest: it fetches the org's own key from the control
+# plane at runtime (AI_KEY_SOURCE=mint, from the env file) and keeps it in
+# memory. The token is minted here at every start: only
 # Grafana (via plugin provisioning, $AI_GATEWAY_TOKEN) and the gateway
 # (via the file) ever hold it, and the metrics scrape reads the file.
 AI_RUN_DIR=/run/ai-gateway
@@ -39,13 +41,12 @@ head -c 48 /dev/urandom | base64 | tr -d '+/=\n' | head -c 48 > "$AI_RUN_DIR/tok
 AI_GATEWAY_TOKEN="$(cat "$AI_RUN_DIR/token")"
 export AI_GATEWAY_TOKEN
 
-if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
-  printf '%s' "$AI_PROVIDER_KEY" > "$AI_RUN_DIR/provider-key"
-  unset AI_PROVIDER_KEY
-  # Asks from inside the Observatory: the box-state sync secret, as a file
-  # the gateway re-reads on every pull. AI_BOX_STATE_URL, AI_BOX_ID and
-  # AI_BOX_STATE_ISSUER pass through from the env file; the gateway refuses
-  # to start on a partial set.
+if [[ -n "${AI_PROVIDER:-}" ]]; then
+  # The box's sync secret, as a file the gateway re-reads on every use: it
+  # pulls the signed box-state with it and mints its ai-key token with it.
+  # AI_KEY_SOURCE, AI_ORG_KEY_URL, AI_SERVICE_TOKEN_URL, AI_BOX_STATE_URL,
+  # AI_BOX_ID and AI_BOX_STATE_ISSUER pass through from the env file; the
+  # gateway refuses to start on a partial set.
   if [[ -n "${AI_BOX_STATE_SECRET:-}" ]]; then
     printf '%s' "$AI_BOX_STATE_SECRET" > "$AI_RUN_DIR/box-state-secret"
     unset AI_BOX_STATE_SECRET
@@ -65,8 +66,6 @@ if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
   # collector as service ai-gateway, which the tools leave out.
   env AI_GATEWAY_LISTEN=0.0.0.0:8091 \
       AI_GATEWAY_TOKEN_FILE="$AI_RUN_DIR/token" \
-      AI_KEY_SOURCE=file \
-      AI_PROVIDER_KEY_FILE="$AI_RUN_DIR/provider-key" \
       AI_GATEWAY_GRAFANA_URL=http://127.0.0.1:3000 \
       AI_STORE_DRIVER=lgtm \
       AI_STORE_TEMPO_URL=http://127.0.0.1:3200 \
@@ -78,7 +77,7 @@ if [[ -n "${AI_PROVIDER_KEY:-}" ]]; then
   # A refused configuration exits 64 with one line naming the variable;
   # it lands in ai_gateway.log and Grafana keeps serving.
 else
-  echo "[dartastic-entrypoint] AI gateway off: no AI_PROVIDER_KEY in /etc/dartastic/ai-gateway.env"
+  echo "[dartastic-entrypoint] AI gateway off: no AI_PROVIDER in /etc/dartastic/ai-gateway.env"
 fi
 umask 022
 

@@ -10,7 +10,7 @@
 #     in OpenMetrics text format (see hosted/ai-gateway/lib/src/
 #     metrics.dart).
 #
-# When AI is off on this box (no AI_PROVIDER_KEY → entrypoint
+# When AI is off on this box (no AI_PROVIDER → entrypoint
 # doesn't start the gateway), the scrape silently fails with up=0
 # and the Mimir series quietly stop updating — no error, no log
 # spam.  When AI flips on, the panel lights up within one scrape

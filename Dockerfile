@@ -19,7 +19,7 @@ ARG UPSTREAM_TAG=latest
 # `build/ai-gateway/` by build-and-push.sh — same pattern as the
 # dashboards staging.  The gateway binary ships in this image but
 # is OFF BY DEFAULT — dartastic-entrypoint.sh only starts it when
-# the box's ai-gateway.env carries AI_PROVIDER_KEY.
+# the box's ai-gateway.env names AI_PROVIDER.
 #
 # License posture: the Dart binary is Pro Commercial (see
 # ../ai-gateway/LICENSE).  Bundling a separately-licensed program
@@ -495,7 +495,7 @@ RUN set -eux; \
 
 # --- Bundle the Dartastic AI gateway binary (#85 P1) ---
 # Off-by-default: the wrapper entrypoint only starts the gateway
-# when the box's ai-gateway.env carries AI_PROVIDER_KEY.
+# when the box's ai-gateway.env names AI_PROVIDER.
 COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 
 # --- OTel collector config override (#85 P1.G) ---
