@@ -62,7 +62,9 @@ if [[ -n "${AI_PROVIDER:-}" ]]; then
   # DAIQ token; every other route needs the gateway token.
   # Grafana's signing keys are read on this container's loopback, and
   # /v1/ask's tools read its Tempo, Loki and Prometheus (single-tenant: they
-  # ignore X-Scope-OrgID). The gateway's own telemetry goes to this box's
+  # ignore X-Scope-OrgID), and its symbolize tool calls this box's
+  # Symbolizer over the compose network with a read-only ai-gateway token.
+  # The gateway's own telemetry goes to this box's
   # collector as service ai-gateway, which the tools leave out.
   env AI_GATEWAY_LISTEN=0.0.0.0:8091 \
       AI_GATEWAY_TOKEN_FILE="$AI_RUN_DIR/token" \
@@ -71,6 +73,7 @@ if [[ -n "${AI_PROVIDER:-}" ]]; then
       AI_STORE_TEMPO_URL=http://127.0.0.1:3200 \
       AI_STORE_LOKI_URL=http://127.0.0.1:3100 \
       AI_STORE_PROMETHEUS_URL=http://127.0.0.1:9090 \
+      AI_SYMBOLIZER_URL=http://symbolizer:8080 \
       OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 \
       OTEL_SERVICE_NAME=ai-gateway \
       /usr/local/bin/ai_gateway >>"$LOG_DIR/ai_gateway.log" 2>&1 &

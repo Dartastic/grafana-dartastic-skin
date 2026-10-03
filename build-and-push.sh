@@ -174,13 +174,15 @@ rsync -a --exclude='.dart_tool' --exclude='pubspec.lock' --exclude='test' \
   --exclude='.gitignore' \
   "$SCRIPT_DIR/../ai-gateway/" "$SCRIPT_DIR/build/ai-gateway/"
 echo "    $(find "$SCRIPT_DIR/build/ai-gateway" -name '*.dart' | wc -l | tr -d ' ') Dart files staged"
-# The box-state package the gateway depends on by path (../packages/…).
+# The packages the gateway depends on by path (../packages/…).
 rm -rf "$SCRIPT_DIR/build/packages"
-mkdir -p "$SCRIPT_DIR/build/packages/dartastic_box_state"
-rsync -a --exclude='.dart_tool' --exclude='pubspec.lock' --exclude='test' \
-  --exclude='.gitignore' \
-  "$SCRIPT_DIR/../packages/dartastic_box_state/" \
-  "$SCRIPT_DIR/build/packages/dartastic_box_state/"
+for pkg in dartastic_box_state dartastic_symbolizer_client; do
+  mkdir -p "$SCRIPT_DIR/build/packages/$pkg"
+  rsync -a --exclude='.dart_tool' --exclude='pubspec.lock' --exclude='test' \
+    --exclude='.gitignore' \
+    "$SCRIPT_DIR/../packages/$pkg/" \
+    "$SCRIPT_DIR/build/packages/$pkg/"
+done
 
 # Stage the AI Grafana plugin (#85 P1.D).  TypeScript source +
 # webpack config; the Dockerfile's stage-2 npm-build produces the

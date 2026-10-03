@@ -29,7 +29,7 @@ ARG UPSTREAM_TAG=latest
 # which does NOT include the ai-gateway source (Pro repo, not OSS).
 FROM dart:stable AS ai-gateway-build
 # /app/ai-gateway beside /app/packages, as in the repo: the gateway depends on
-# packages/dartastic_box_state by path.
+# packages/dartastic_box_state and packages/dartastic_symbolizer_client by path.
 WORKDIR /app/ai-gateway
 COPY build/ai-gateway/pubspec.* /app/ai-gateway/
 COPY build/packages/ /app/packages/
