@@ -36,7 +36,7 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 \
     || { echo "ERROR: missing required command: $1" >&2; exit 1; }
 }
-need_cmd docker; need_cmd jq; need_cmd curl; need_cmd python3
+need_cmd docker; need_cmd jq; need_cmd curl; need_cmd python3; need_cmd rsync
 
 # ── Pick SKIN_REV against GHCR — the registry is the only truth ──
 # Shared with build-and-push.sh: this file used to carry its own copy of the
@@ -113,9 +113,21 @@ python3 "$SCRIPT_DIR/build/rewrite-locale.py" \
   "$SCRIPT_DIR/build/upstream-grafana-en-US.json" \
   "$SCRIPT_DIR/build/skin-grafana-en-US.json"
 
+# Stage the AI Grafana plugin source (D23): the Dockerfile's node stage
+# builds it, as in the lgtm image. build/ is never mirrored.
+rm -rf "$SCRIPT_DIR/build/ai-plugin"
+mkdir -p "$SCRIPT_DIR/build/ai-plugin"
+rsync -a --exclude='node_modules' --exclude='dist' --exclude='.gitignore' \
+  "$SCRIPT_DIR/../grafana-plugins/dartastic-ai-panel/" "$SCRIPT_DIR/build/ai-plugin/"
+# The AI plugin's @dartastic-io/ai-ask comes from GitHub Packages: the image
+# build reads it with NODE_AUTH_TOKEN, passed as the BuildKit secret npm_token.
+[[ -n "${NODE_AUTH_TOKEN:-}" ]] \
+  || { echo "ERROR: NODE_AUTH_TOKEN is unset (a token that may read @dartastic-io/ai-ask on GitHub Packages)" >&2; exit 1; }
+
 if [[ "${PUSH}" == "1" ]]; then
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
+    --secret id=npm_token,env=NODE_AUTH_TOKEN \
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \
@@ -124,6 +136,7 @@ if [[ "${PUSH}" == "1" ]]; then
     --push .
 else
   docker buildx build \
+    --secret id=npm_token,env=NODE_AUTH_TOKEN \
     --file Dockerfile.grafana \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --build-arg "PRODUCT_NAME=${PRODUCT_NAME}" \

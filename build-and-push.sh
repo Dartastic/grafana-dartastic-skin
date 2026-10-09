@@ -211,9 +211,14 @@ python3 "$SCRIPT_DIR/build/rewrite-locale.py" \
   "$SCRIPT_DIR/build/upstream-en-US.json" \
   "$SCRIPT_DIR/build/skin-en-US.json"
 
+# The AI plugin's @dartastic-io/ai-ask comes from GitHub Packages: the image
+# build reads it with NODE_AUTH_TOKEN, passed as the BuildKit secret npm_token.
+[[ -n "${NODE_AUTH_TOKEN:-}" ]] \
+  || { echo "ERROR: NODE_AUTH_TOKEN is unset (a token that may read @dartastic-io/ai-ask on GitHub Packages)" >&2; exit 1; }
 if [[ "${PUSH}" == "1" ]]; then
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
+    --secret id=npm_token,env=NODE_AUTH_TOKEN \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --tag "${FULL}" \
     --tag "${LATEST}" \
@@ -221,6 +226,7 @@ if [[ "${PUSH}" == "1" ]]; then
     .
 else
   docker buildx build \
+    --secret id=npm_token,env=NODE_AUTH_TOKEN \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --tag "${FULL}" \
     --tag "${LATEST}" \

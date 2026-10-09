@@ -7,8 +7,9 @@
 # Hosted convergence, Hosted boxes too — at which point lgtm-skinned retires.
 #
 # What is deliberately NOT here (vs ../Dockerfile):
-#   - AI gateway + AI panel plugin stages (single-tenant secrets model;
-#     deferred on Cloud — #85 posture unchanged for Hosted's lgtm image).
+#   - The AI gateway (Cloud runs it as its own ai-gateway service). The AI
+#     panel plugin IS here (D23): built below, installed at start by
+#     grafana-entrypoint.sh, enabled per org by the tenant-reconciler.
 #   - File-provisioned customer dashboards + default alerting contact point:
 #     on the discrete stack the tenant-reconciler imports dashboards and
 #     creates contact points PER GRAFANA ORG via the admin API (file
@@ -24,6 +25,19 @@
 # Build: ./build-grafana-skinned.sh   (stages the locale rewrite, then builds)
 # Gate:  the same brand-scan (../brand-scan/) must pass against this image.
 ARG UPSTREAM_TAG=13.0.1
+
+# --- The Dartastic AI Grafana plugin (D23), as in ../Dockerfile ---
+# Source staged into build/ai-plugin/ by build-grafana-skinned.sh (commercial,
+# never mirrored); built against its committed lockfile.
+FROM node:20-slim AS ai-plugin-build
+WORKDIR /plugin
+COPY build/ai-plugin/ /plugin/
+# @dartastic-io/ai-ask comes from GitHub Packages: the BuildKit secret
+# `npm_token` (never a layer) is NODE_AUTH_TOKEN for this one install.
+RUN --mount=type=secret,id=npm_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/npm_token)" && export NODE_AUTH_TOKEN \
+ && npm ci --no-audit --no-fund
+RUN npm run build
 
 FROM grafana/grafana:${UPSTREAM_TAG}
 ARG UPSTREAM_TAG
@@ -190,6 +204,19 @@ COPY build/skin-grafana-en-US.json  ${GF_PUBLIC}/locales/en-US/grafana.json
 # unsigned-plugin allow for the AI panel — harmless when the plugin isn't
 # bundled, and ready for when AI lands on the discrete stack).
 COPY conf/custom.ini            /etc/grafana/grafana.ini
+# The AI plugin's lines (as ../Dockerfile adds them): its two ids load
+# unsigned, and idForwarding sends the signed ID token (X-Grafana-Id) the
+# gateway reads the asker from.
+RUN ini=/etc/grafana/grafana.ini; \
+    sed -i 's/^\[plugins\]$/[plugins]\nallow_loading_unsigned_plugins = dartastic-ai-panel,dartastic-ai-panel-panel/' "$ini"; \
+    sed -i 's/^\[feature_toggles\]$/[feature_toggles]\nidForwarding = true/' "$ini"; \
+    grep -qx 'allow_loading_unsigned_plugins = dartastic-ai-panel,dartastic-ai-panel-panel' "$ini" \
+      || { echo "ERROR: no [plugins] section in custom.ini to carry the AI plugin allowance" >&2; exit 1; }; \
+    grep -qx 'idForwarding = true' "$ini" \
+      || { echo "ERROR: no [feature_toggles] section in custom.ini to carry idForwarding" >&2; exit 1; }
+# The plugin's build, outside /var/lib/grafana (the data volume hides
+# anything baked there); grafana-entrypoint.sh installs it at start.
+COPY --from=ai-plugin-build /plugin/dist/ /usr/share/dartastic/plugins/dartastic-ai-panel/
 
 # --- Template patches via sed (same as ../Dockerfile; brand-neutral title) ---
 # Title is "Dartastic" (not "Dartastic Hosted") — this image serves Cloud now

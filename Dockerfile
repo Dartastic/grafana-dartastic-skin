@@ -57,7 +57,11 @@ COPY build/ai-plugin/ /plugin/
 # this repo had changed; the registry had. A build that can break without a
 # commit cannot be reasoned about, and this image is how boxes get their
 # dashboards.
-RUN npm ci --no-audit --no-fund
+# @dartastic-io/ai-ask comes from GitHub Packages: the BuildKit secret
+# `npm_token` (never a layer) is NODE_AUTH_TOKEN for this one install.
+RUN --mount=type=secret,id=npm_token \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/npm_token)" && export NODE_AUTH_TOKEN \
+ && npm ci --no-audit --no-fund
 RUN npm run build
 
 # --- Stage 2: the skinned LGTM image (the deployable) ---
