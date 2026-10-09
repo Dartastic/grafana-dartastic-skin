@@ -58,8 +58,8 @@ if [[ -n "${AI_PROVIDER:-}" ]]; then
   # nginx at https://<box>/ai/v1/ask and is proxied to the host's
   # 127.0.0.1:8091, published from here (docker-compose.dartastic.yml). So
   # the gateway listens on the container's interfaces; the host publishes it
-  # on loopback only, and nginx forwards exactly /ai/v1/ask. /v1/ask needs a
-  # DAIQ token; every other route needs the gateway token.
+  # on loopback only, and nginx forwards exactly /ai/v1/ask (and GET /ai/v1/questions). /v1/ask and
+  # /v1/questions need a DAIQ token; every other route needs the gateway token.
   # Grafana's signing keys are read on this container's loopback, and
   # /v1/ask's tools read its Tempo, Loki and Prometheus (single-tenant: they
   # ignore X-Scope-OrgID), and its symbolize tool calls this box's
