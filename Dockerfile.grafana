@@ -29,7 +29,7 @@ ARG UPSTREAM_TAG=13.0.1
 # --- The Dartastic AI Grafana plugin (D23), as in ../Dockerfile ---
 # Source staged into build/ai-plugin/ by build-grafana-skinned.sh (commercial,
 # never mirrored); built against its committed lockfile.
-FROM node:20-slim AS ai-plugin-build
+FROM node:22-slim AS ai-plugin-build
 WORKDIR /plugin
 COPY build/ai-plugin/ /plugin/
 # @dartastic-io/ai-ask comes from GitHub Packages: the BuildKit secret

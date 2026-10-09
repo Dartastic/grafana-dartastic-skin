@@ -46,7 +46,7 @@ RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
 #
 # Plugin source-of-truth: hosted/grafana-plugins/dartastic-ai-panel/.
 # Staged into build/ai-plugin/ by build-and-push.sh.
-FROM node:20-slim AS ai-plugin-build
+FROM node:22-slim AS ai-plugin-build
 WORKDIR /plugin
 COPY build/ai-plugin/ /plugin/
 # `npm ci`, against a COMMITTED lockfile. This was `npm install` with no lock,
@@ -411,8 +411,9 @@ COPY build/skin-en-US.json      ${GF_PUBLIC}/locales/en-US/grafana.json
 # Grafana" tutorial card on the home dashboard), and the upstream
 # help menu (mostly grafana.com doc links).
 COPY conf/custom.ini            /otel-lgtm/grafana/conf/custom.ini
-# Hosted-only AI lines. conf/custom.ini is shared with the Cloud image, which
-# never has AI, so they are added here instead:
+# The AI lines. conf/custom.ini is shared with images that carry no AI
+# plugin, so each image that does adds them itself (here, and the Cloud
+# image in Dockerfile.grafana, the same two lines):
 #   - allow the AI plugin (the app and its nested panel, which Grafana checks
 #     on its own id) to load unsigned; nothing else is allowed unsigned;
 #   - idForwarding: the AI gateway takes the org and role only from
