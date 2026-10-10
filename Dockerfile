@@ -44,9 +44,6 @@ RUN --mount=type=secret,id=pub_token \
 COPY build/ai-gateway/ /app/ai-gateway/
 RUN dart pub get --offline
 RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
-# The compiled dependency's catalog.json beside the executable (see
-# ai-gateway/Dockerfile). TODO(semantics const catalog): drop this step.
-RUN dart tool/copy_semantics_catalog.dart /app/dartastic_semantics_catalog.json
 
 # --- Stage 1b: Build the Dartastic AI Grafana plugin (#85 P1.D) ---
 #
@@ -512,7 +509,6 @@ RUN set -eux; \
 # Off-by-default: the wrapper entrypoint only starts the gateway
 # when the box's ai-gateway.env names AI_PROVIDER.
 COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
-COPY --from=ai-gateway-build /app/dartastic_semantics_catalog.json /usr/local/bin/dartastic_semantics_catalog.json
 
 # --- OTel collector config override (#85 P1.G) ---
 # Replaces upstream's /otel-lgtm/otelcol-config.yaml.  Adds a
