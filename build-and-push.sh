@@ -215,10 +215,15 @@ python3 "$SCRIPT_DIR/build/rewrite-locale.py" \
 # build reads it with NODE_AUTH_TOKEN, passed as the BuildKit secret npm_token.
 [[ -n "${NODE_AUTH_TOKEN:-}" ]] \
   || { echo "ERROR: NODE_AUTH_TOKEN is unset (a token that may read @dartastic-io/ai-ask on GitHub Packages)" >&2; exit 1; }
+# The AI gateway's dartastic_semantics comes from pub.dartastic.io: the read
+# token is the BuildKit secret pub_token (never printed, never a layer).
+[[ -n "${DARTASTIC_PUB_READ_TOKEN:-}" ]] \
+  || { echo "ERROR: DARTASTIC_PUB_READ_TOKEN is unset (the pub.dartastic.io read token)" >&2; exit 1; }
 if [[ "${PUSH}" == "1" ]]; then
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
     --secret id=npm_token,env=NODE_AUTH_TOKEN \
+    --secret id=pub_token,env=DARTASTIC_PUB_READ_TOKEN \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --tag "${FULL}" \
     --tag "${LATEST}" \
@@ -227,6 +232,7 @@ if [[ "${PUSH}" == "1" ]]; then
 else
   docker buildx build \
     --secret id=npm_token,env=NODE_AUTH_TOKEN \
+    --secret id=pub_token,env=DARTASTIC_PUB_READ_TOKEN \
     --build-arg "UPSTREAM_TAG=${UPSTREAM_TAG}" \
     --tag "${FULL}" \
     --tag "${LATEST}" \

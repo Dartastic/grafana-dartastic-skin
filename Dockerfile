@@ -33,10 +33,20 @@ FROM dart:stable AS ai-gateway-build
 WORKDIR /app/ai-gateway
 COPY build/ai-gateway/pubspec.* /app/ai-gateway/
 COPY build/packages/ /app/packages/
-RUN dart pub get
+# dartastic_semantics comes from the private registry: the read token is the
+# BuildKit secret pub_token (never an ARG/ENV), removed in the same layer.
+# Same pattern as symbolize-enrich/Dockerfile.
+ARG PUB_REGISTRY=https://pub.dartastic.io
+RUN --mount=type=secret,id=pub_token \
+    dart pub token add "$PUB_REGISTRY" < /run/secrets/pub_token \
+ && dart pub get \
+ && dart pub token remove "$PUB_REGISTRY"
 COPY build/ai-gateway/ /app/ai-gateway/
 RUN dart pub get --offline
 RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
+# The compiled dependency's catalog.json beside the executable (see
+# ai-gateway/Dockerfile). TODO(semantics const catalog): drop this step.
+RUN dart tool/copy_semantics_catalog.dart /app/dartastic_semantics_catalog.json
 
 # --- Stage 1b: Build the Dartastic AI Grafana plugin (#85 P1.D) ---
 #
@@ -502,6 +512,7 @@ RUN set -eux; \
 # Off-by-default: the wrapper entrypoint only starts the gateway
 # when the box's ai-gateway.env names AI_PROVIDER.
 COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
+COPY --from=ai-gateway-build /app/dartastic_semantics_catalog.json /usr/local/bin/dartastic_semantics_catalog.json
 
 # --- OTel collector config override (#85 P1.G) ---
 # Replaces upstream's /otel-lgtm/otelcol-config.yaml.  Adds a
