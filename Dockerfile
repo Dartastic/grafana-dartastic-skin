@@ -29,7 +29,8 @@ ARG UPSTREAM_TAG=latest
 # which does NOT include the ai-gateway source (Pro repo, not OSS).
 FROM dart:stable AS ai-gateway-build
 # /app/ai-gateway beside /app/packages, as in the repo: the gateway depends on
-# packages/dartastic_box_state and packages/hosted_symbolizer_client by path.
+# packages/dartastic_box_state, packages/hosted_symbolizer_client and
+# packages/hosted_otel by path.
 WORKDIR /app/ai-gateway
 COPY build/ai-gateway/pubspec.* /app/ai-gateway/
 COPY build/packages/ /app/packages/
@@ -43,7 +44,8 @@ RUN --mount=type=secret,id=pub_token \
  && dart pub token remove "$PUB_REGISTRY"
 COPY build/ai-gateway/ /app/ai-gateway/
 RUN dart pub get --offline
-RUN dart compile exe bin/ai_gateway.dart -o /app/ai_gateway
+RUN v="$(sed -nE 's/^version: *//p' pubspec.yaml)" \
+ && dart compile exe -DAI_GATEWAY_VERSION="$v" bin/ai_gateway.dart -o /app/ai_gateway
 
 # --- Stage 1b: Build the Dartastic AI Grafana plugin (#85 P1.D) ---
 #
