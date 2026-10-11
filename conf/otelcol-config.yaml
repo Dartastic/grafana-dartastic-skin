@@ -2,19 +2,10 @@
 #
 # Replaces /otel-lgtm/otelcol-config.yaml inside the lgtm-skinned
 # image.  Identical to the upstream `grafana/otel-lgtm` default
-# EXCEPT for one addition:
-#
-#   - `prometheus/ai-gateway` receiver scrapes the bundled Dartastic
-#     AI gateway's /metrics endpoint at 127.0.0.1:8091 every 15s.
-#     The gateway exposes per-customer query / token / cost counters
-#     in OpenMetrics text format (see hosted/ai-gateway/lib/src/
-#     metrics.dart).
-#
-# When AI is off on this box (no AI_PROVIDER → entrypoint
-# doesn't start the gateway), the scrape silently fails with up=0
-# and the Mimir series quietly stop updating — no error, no log
-# spam.  When AI flips on, the panel lights up within one scrape
-# interval.
+# except for Dartastic's additions below (the log event-name transform).
+# The bundled AI gateway's metrics are OTel instruments it exports over
+# OTLP like the rest of its telemetry; the `/metrics` scrape that used to
+# live here is gone (2026-10-11).
 #
 # Upstream-tracking note: when bumping UPSTREAM_TAG, diff this file
 # against `docker run --rm grafana/otel-lgtm:<new-tag> cat
@@ -37,21 +28,6 @@ receivers:
           scrape_interval: 1s
           static_configs:
             - targets: ["127.0.0.1:8888"]
-  # Dartastic-added: scrape the bundled AI gateway's /metrics, with the
-  # gateway bearer token dartastic-entrypoint.sh mints at every start.
-  prometheus/ai-gateway:
-    config:
-      scrape_configs:
-        - job_name: "dartastic-ai-gateway"
-          scrape_interval: 15s
-          metrics_path: "/metrics"
-          authorization:
-            type: Bearer
-            credentials_file: /run/ai-gateway/token
-          static_configs:
-            - targets: ["127.0.0.1:8091"]
-
-extensions:
   health_check:
     endpoint: 0.0.0.0:13133
     path: "/ready"
@@ -100,8 +76,7 @@ service:
       processors: [batch]
       exporters: [otlp_http/traces]
     metrics:
-      # Dartastic-added: prometheus/ai-gateway joins the metrics pipeline.
-      receivers: [otlp, prometheus/collector, prometheus/ai-gateway]
+      receivers: [otlp, prometheus/collector]
       processors: [batch]
       exporters: [otlp_http/metrics]
     logs:

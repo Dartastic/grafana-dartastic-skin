@@ -32,7 +32,7 @@ mkdir -p "$LOG_DIR"
 # plane at runtime (AI_KEY_SOURCE=mint, from the env file) and keeps it in
 # memory. The token is minted here at every start: only
 # Grafana (via plugin provisioning, $AI_GATEWAY_TOKEN) and the gateway
-# (via the file) ever hold it, and the metrics scrape reads the file.
+# (via the file) ever hold it.
 AI_RUN_DIR=/run/ai-gateway
 mkdir -p "$AI_RUN_DIR"
 chmod 0700 "$AI_RUN_DIR"

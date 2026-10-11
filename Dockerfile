@@ -511,13 +511,11 @@ RUN set -eux; \
 COPY --from=ai-gateway-build /app/ai_gateway /usr/local/bin/ai_gateway
 
 # --- OTel collector config override (#85 P1.G) ---
-# Replaces upstream's /otel-lgtm/otelcol-config.yaml.  Adds a
-# `prometheus/ai-gateway` receiver that scrapes the bundled AI
-# gateway's /metrics on 127.0.0.1:8091 every 15s and routes the
-# samples through the existing metrics pipeline into Prometheus
-# (the metrics store otel-lgtm bundles — not Mimir).  When
-# AI is off on this box the scrape quietly fails (up=0); nothing
-# else changes.  When the upstream tag bumps, reconcile against
+# Replaces upstream's /otel-lgtm/otelcol-config.yaml with Dartastic's
+# additions (the log event-name transform). The bundled AI gateway's
+# metrics are OTel instruments it exports over OTLP with the rest of its
+# telemetry; the /metrics scrape that used to be added here is gone
+# (2026-10-11).  When the upstream tag bumps, reconcile against
 # `docker run --rm grafana/otel-lgtm:<new-tag> cat
 # /otel-lgtm/otelcol-config.yaml`.
 COPY conf/otelcol-config.yaml   /otel-lgtm/otelcol-config.yaml
